@@ -33,7 +33,8 @@ add_executable(deltaVisViewer
     EntryPoint.cpp
 )
 target_link_libraries(deltaVisViewer PRIVATE 
-    deviceCode_ptx 
+    deviceCode_ptx
+    owl::owl
     ${UMESH_LIBRARIES})
 
 
