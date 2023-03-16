@@ -1,3 +1,4 @@
+#pragma once
 // public owl node-graph API
 #include "owl/owl.h"
 #include "DeviceCode.h"

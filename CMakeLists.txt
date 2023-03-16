@@ -6,16 +6,28 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+find_package(OpenGL REQUIRED)
+
 add_subdirectory(submodules/owl EXCLUDE_FROM_ALL)
 
 include(embed_ptx)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+#--------------------GLFW---------------------#
+set(GLFW_BUILD_DOCS OFF CACHE STRING "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE STRING "" FORCE)
+set(GLFW_BUILD_TESTS    OFF CACHE STRING "" FORCE)
+set(GLFW_INSTALL        OFF CACHE STRING "" FORCE)
+add_subdirectory(submodules/glfw)
+set_property(TARGET glfw PROPERTY FOLDER "submodules/GLFW3" )
+#----------------------------------------------#
+
 #umesh
 add_subdirectory(submodules/umesh)
 add_definitions(${UMESH_DEFINITIONS})
-include_directories(${UMESH_INCLUDES})
+include_directories(${UMESH_INCLUDES}
+  submodules/glfw/include)
 
 embed_ptx(
   OUTPUT_TARGET
@@ -36,7 +48,9 @@ add_executable(deltaVisViewer
 )
 target_link_libraries(deltaVisViewer PRIVATE 
     deviceCode_ptx
+    PRIVATE ${OPENGL_LIBRARIES}
     owl::owl
+    PRIVATE glfw
     ${UMESH_LIBRARIES})
 
 
