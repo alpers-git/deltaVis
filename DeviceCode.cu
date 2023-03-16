@@ -5,11 +5,11 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)()
 {
   const RayGenData &self = owl::getProgramData<RayGenData>();
   const vec2i pixelID = owl::getLaunchIndex();
-  if (pixelID == owl::vec2i(0)) {
-    printf("%sHello OptiX From your First RayGen Program%s\n",
-           OWL_TERMINAL_CYAN,
-           OWL_TERMINAL_DEFAULT);
-  }
+  // if (pixelID == owl::vec2i(0)) {
+  //   printf("%sHello OptiX From your First RayGen Program%s\n",
+  //          OWL_TERMINAL_CYAN,
+  //          OWL_TERMINAL_DEFAULT);
+  // }
 
   const vec2f screen = (vec2f(pixelID)+vec2f(.5f)) / vec2f(self.fbSize);
   owl::Ray ray;
@@ -55,6 +55,6 @@ OPTIX_MISS_PROGRAM(miss)()
   const MissProgData &self = owl::getProgramData<MissProgData>();
   
   vec3f &prd = owl::getPRD<vec3f>();
-  int pattern = (pixelID.x / 8) ^ (pixelID.y/8);
+  int pattern = (pixelID.x / 18) ^ (pixelID.y/18);
   prd = (pattern&1) ? self.color1 : self.color0;
 }

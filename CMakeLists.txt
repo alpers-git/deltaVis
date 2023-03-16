@@ -31,6 +31,8 @@ embed_ptx(
 
 add_executable(deltaVisViewer
     EntryPoint.cpp
+    Renderer.h
+    Renderer.cpp
 )
 target_link_libraries(deltaVisViewer PRIVATE 
     deviceCode_ptx
