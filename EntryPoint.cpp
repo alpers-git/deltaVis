@@ -38,6 +38,16 @@ int main(int ac, char **av)
     renderer.Render();
     const uint32_t *fb
         = (const uint32_t*)owlBufferGetPointer(renderer.frameBuffer,0);
+
+    float mouseDeltaX = glfw->mouseState.mouseDelta.x;
+    float mouseDeltaY = glfw->mouseState.mouseDelta.y;
+
+    if(glfw->mouseState.leftButtonDown)
+    {
+      renderer.camera.lens.center += renderer.camera.lens.du * mouseDeltaX;
+      renderer.camera.lens.center += renderer.camera.lens.dv * mouseDeltaY;
+      renderer.UpdateCamera();
+    }
     
     //draw the frame to the window
     glfw->draw((void*)fb);

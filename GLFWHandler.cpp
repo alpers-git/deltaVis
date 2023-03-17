@@ -32,6 +32,8 @@ void GLFWHandler::initWindow(int width, int height, std::string title)
     glfwWindowHint(GLFW_VISIBLE, true);
     window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
     glfwGetWindowSize(window, &winSize.x, &winSize.y);
+
+    SetCallbacks();
     if (!window)
     {
         glfwTerminate();
@@ -44,6 +46,31 @@ void GLFWHandler::initWindow(int width, int height, std::string title)
     glBindTexture(GL_TEXTURE_2D, fbTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, nullptr);
+}
+
+void GLFWHandler::SetCallbacks()
+{
+    glfwSetCursorPosCallback(window, [](GLFWwindow *window, double x, double y) {
+        auto glfw = GLFWHandler::getInstance();
+        glfw->mouseState.mouseDelta = owl::vec2f(x, y) - glfw->mouseState.mousePos;
+        glfw->mouseState.mousePos = owl::vec2f(x, y);
+    });
+
+    glfwSetMouseButtonCallback(window, [](GLFWwindow *window, int button, int action, int mods) {
+        auto glfw = GLFWHandler::getInstance();
+        if (button == GLFW_MOUSE_BUTTON_LEFT)
+        {
+            glfw->mouseState.leftButtonDown = action == GLFW_PRESS;
+        }
+        else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+        {
+            glfw->mouseState.rightButtonDown = action == GLFW_PRESS;
+        }
+        else if (button == GLFW_MOUSE_BUTTON_MIDDLE)
+        {
+            glfw->mouseState.middleButtonDown = action == GLFW_PRESS;
+        }
+    });
 }
 
 void GLFWHandler::destroyWindow()

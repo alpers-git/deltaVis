@@ -25,6 +25,13 @@ class GLFWHandler
         void draw(const void* fbpointer);
 
 
+        struct MouseState {
+            owl::vec2f mousePos;
+            owl::vec2f mouseDelta;
+            bool leftButtonDown;
+            bool rightButtonDown;
+            bool middleButtonDown;
+        } mouseState;
     private:
         GLFWwindow* window;
         owl::vec2i winSize;
@@ -35,4 +42,8 @@ class GLFWHandler
         static GLFWHandler* instance;
         GLFWHandler();
         ~GLFWHandler();
+
+
+        void SetCallbacks();
+        
 };

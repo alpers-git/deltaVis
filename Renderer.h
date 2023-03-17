@@ -38,6 +38,10 @@ public:
     void Render();
     void Shutdown();
 
+    void UpdateCamera();
+
+    SimpleCamera camera;
+
     OWLRayGen  rayGen  { 0 };
     OWLContext context { 0 };
     OWLGroup   world   { 0 };

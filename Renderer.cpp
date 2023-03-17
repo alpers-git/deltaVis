@@ -154,25 +154,25 @@ void Renderer::Init()
                         rayGenVars,-1);
 
     // ----------- compute variable values  ------------------
-    vec3f camera_pos = lookFrom;
+    camera.lens.center = lookFrom;
     vec3f camera_d00
-        = normalize(lookAt-lookFrom);
+        = normalize(lookAt-camera.lens.center);
     float aspect = fbSize.x / float(fbSize.y);
-    vec3f camera_ddu
+    camera.lens.du
         = cosFovy * aspect * normalize(cross(camera_d00,lookUp));
-    vec3f camera_ddv
-        = cosFovy * normalize(cross(camera_ddu,camera_d00));
-    camera_d00 -= 0.5f * camera_ddu;
-    camera_d00 -= 0.5f * camera_ddv;
+    camera.lens.dv
+        = cosFovy * normalize(cross(camera.lens.du,camera_d00));
+    camera_d00 -= 0.5f * camera.lens.du;
+    camera_d00 -= 0.5f * camera.lens.dv;
 
     // ----------- set variables  ----------------------------
     owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
     owlRayGenSet2i    (rayGen,"fbSize",       (const owl2i&)fbSize);
     owlRayGenSetGroup (rayGen,"world",        world);
-    owlRayGenSet3f    (rayGen,"camera.pos",   (const owl3f&)camera_pos);
+    owlRayGenSet3f    (rayGen,"camera.pos",   (const owl3f&)camera.lens.center);
     owlRayGenSet3f    (rayGen,"camera.dir_00",(const owl3f&)camera_d00);
-    owlRayGenSet3f    (rayGen,"camera.dir_du",(const owl3f&)camera_ddu);
-    owlRayGenSet3f    (rayGen,"camera.dir_dv",(const owl3f&)camera_ddv);
+    owlRayGenSet3f    (rayGen,"camera.dir_du",(const owl3f&)camera.lens.du);
+    owlRayGenSet3f    (rayGen,"camera.dir_dv",(const owl3f&)camera.lens.dv);
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -189,8 +189,20 @@ void Renderer::Render()
         // for host pinned mem it doesn't matter which device we query...
         //const uint32_t *fb = (const uint32_t*)owlBufferGetPointer(frameBuffer,0);
 }
+
 void Renderer::Shutdown()
 {
     LOG("destroying devicegroup ...");
     owlContextDestroy(context);
+}
+
+
+void Renderer::UpdateCamera()
+{
+  vec3f camera_d00
+        = normalize(lookAt-camera.lens.center);
+  owlRayGenSet3f    (rayGen,"camera.pos",   (const owl3f&)camera.lens.center);
+  owlRayGenSet3f    (rayGen,"camera.dir_00",(const owl3f&)camera_d00);
+  owlRayGenSet3f    (rayGen,"camera.dir_du",(const owl3f&)camera.lens.du);
+  owlRayGenSet3f    (rayGen,"camera.dir_dv",(const owl3f&)camera.lens.dv);
 }
