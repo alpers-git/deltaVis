@@ -45,6 +45,8 @@ add_executable(deltaVisViewer
     EntryPoint.cpp
     Renderer.h
     Renderer.cpp
+    GLFWHandler.h
+    GLFWHandler.cpp
 )
 target_link_libraries(deltaVisViewer PRIVATE 
     deviceCode_ptx
