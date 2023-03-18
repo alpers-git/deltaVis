@@ -51,6 +51,7 @@ add_executable(deltaVisViewer
     Camera.cpp
     CameraManipulator.h
     CameraManipulator.cpp
+    stb_image_write.h
 )
 target_link_libraries(deltaVisViewer PRIVATE 
     deviceCode_ptx

@@ -14,7 +14,7 @@
 #include "owl/helper/cuda.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "./../../../deltaVis/submodules/owl/3rdParty/stb_image/stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 
 const char *outFileName = "s01-simpleTriangles";
@@ -23,6 +23,7 @@ using namespace deltaVis;
 
 int main(int ac, char **av)
 {
+  stbi_flip_vertically_on_write(true);
   // create a context on the first device:
   Renderer renderer;
   renderer.Init();
@@ -49,8 +50,13 @@ int main(int ac, char **av)
 
     assert(fb);
     
-    // stbi_write_png(std::string(outFileName + std::to_string(fCount%10) + ".png").c_str(),renderer.fbSize.x,renderer.fbSize.y,4,
-    //                 fb,renderer.fbSize.x*sizeof(uint32_t));
+    // if(glfw->key.isPressed(GLFW_KEY_ESCAPE))
+    //   glfw->setWindowShouldClose(true);
+
+    //Taking a snapshot of the current frame
+    if(glfw->key.isPressed(GLFW_KEY_1) && glfw->key.isDown(GLFW_KEY_RIGHT_SHIFT)) //!
+      stbi_write_png(std::string("frame.png").c_str(),renderer.fbSize.x,renderer.fbSize.y,4,
+                    fb,renderer.fbSize.x*sizeof(uint32_t));
     fCount++;
 
     glfw->swapBuffers();

@@ -130,8 +130,8 @@ void Renderer::Init()
                         missProgVars,-1);
 
   // ----------- set variables  ----------------------------
-  owlMissProgSet3f(missProg,"color0",owl3f{.8f,0.f,0.f});
-  owlMissProgSet3f(missProg,"color1",owl3f{.8f,.8f,.8f});
+  owlMissProgSet3f(missProg,"color0",owl3f{.2f,.2f,.26f});
+  owlMissProgSet3f(missProg,"color1",owl3f{.1f,.1f,.16f});
 
 
     // -------------------------------------------------------

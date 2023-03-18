@@ -71,6 +71,14 @@ void GLFWHandler::SetCallbacks()
             glfw->mouseState.middleButtonDown = action == GLFW_PRESS;
         }
     });
+
+    glfwSetKeyCallback(window, [](GLFWwindow *window, int key, int scancode, int action, int mods) {
+        auto glfw = GLFWHandler::getInstance();
+        if(action == GLFW_PRESS || action == GLFW_REPEAT)
+            glfw->key.keys[key] = action;
+        else
+            glfw->key.keys.erase(key);
+    });
 }
 
 void GLFWHandler::destroyWindow()

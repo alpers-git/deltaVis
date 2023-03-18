@@ -1,6 +1,7 @@
 //A singleton class that handles all GLFW related functions
 #include <iostream>
 #include <string>
+#include <unordered_map>
 
 #include "GL/gl.h"
 #include "GLFW/glfw3.h"
@@ -33,6 +34,33 @@ class GLFWHandler
             bool rightButtonDown = false;
             bool middleButtonDown = false;
         } mouseState;
+
+        struct KeyboardState {
+            std::unordered_map<int, int> keys;// Keys and their last GLFW action
+            bool isDown(int key) {
+                if (keys.find(key) == keys.end()) 
+                {
+                    return false;
+                }
+                return true; 
+            }
+
+            bool isPressed(int key) {
+                if (keys.find(key) == keys.end()) 
+                {
+                    return false;
+                }
+                return keys[key] == GLFW_PRESS;
+            }
+
+            bool isRepeated(int key) {
+                if (keys.find(key) == keys.end()) 
+                {
+                    return false;
+                }
+                return keys[key] == GLFW_REPEAT;
+            }
+        } key;
     private:
         GLFWwindow* window;
         owl::vec2i winSize;
