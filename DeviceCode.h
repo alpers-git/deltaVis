@@ -24,10 +24,10 @@ struct RayGenData
   OptixTraversableHandle world;
 
   struct {
-    vec3f pos;
-    vec3f dir_00;
-    vec3f dir_du;
-    vec3f dir_dv;
+      vec3f origin;
+      vec3f lower_left_corner;
+      vec3f horizontal;
+      vec3f vertical;
   } camera;
 };
 

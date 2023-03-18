@@ -22,15 +22,16 @@ class GLFWHandler
         void pollEvents();
         int windowShouldClose();
         void* getWindowUserPointer();
+        owl::vec2i getWindowSize();
         void draw(const void* fbpointer);
 
 
         struct MouseState {
-            owl::vec2f mousePos;
-            owl::vec2f mouseDelta;
-            bool leftButtonDown;
-            bool rightButtonDown;
-            bool middleButtonDown;
+            owl::vec2f position;
+            owl::vec2f delta;
+            bool leftButtonDown = false;
+            bool rightButtonDown = false;
+            bool middleButtonDown = false;
         } mouseState;
     private:
         GLFWwindow* window;

@@ -34,7 +34,8 @@ vec3i indices[NUM_INDICES] =
     { 1,5,7 }, { 1,7,3 },
     { 4,0,2 }, { 4,2,6 }
   };
-
+namespace deltaVis
+{
 Renderer::Renderer()
 {
 
@@ -140,10 +141,10 @@ void Renderer::Init()
         { "fbPtr",         OWL_BUFPTR, OWL_OFFSETOF(RayGenData,fbPtr)},
         { "fbSize",        OWL_INT2,   OWL_OFFSETOF(RayGenData,fbSize)},
         { "world",         OWL_GROUP,  OWL_OFFSETOF(RayGenData,world)},
-        { "camera.pos",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.pos)},
-        { "camera.dir_00", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_00)},
-        { "camera.dir_du", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_du)},
-        { "camera.dir_dv", OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.dir_dv)},
+        { "camera.org",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.origin)},
+        { "camera.llc",    OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.lower_left_corner)},
+        { "camera.horiz",  OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.horizontal)},
+        { "camera.vert",   OWL_FLOAT3, OWL_OFFSETOF(RayGenData,camera.vertical)},
         { /* sentinel to mark end of list */ }
     };
 
@@ -152,27 +153,12 @@ void Renderer::Init()
         = owlRayGenCreate(context,module,"simpleRayGen",
                         sizeof(RayGenData),
                         rayGenVars,-1);
-
-    // ----------- compute variable values  ------------------
-    camera.lens.center = lookFrom;
-    vec3f camera_d00
-        = normalize(lookAt-camera.lens.center);
-    float aspect = fbSize.x / float(fbSize.y);
-    camera.lens.du
-        = cosFovy * aspect * normalize(cross(camera_d00,lookUp));
-    camera.lens.dv
-        = cosFovy * normalize(cross(camera.lens.du,camera_d00));
-    camera_d00 -= 0.5f * camera.lens.du;
-    camera_d00 -= 0.5f * camera.lens.dv;
-
+                        
     // ----------- set variables  ----------------------------
     owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
     owlRayGenSet2i    (rayGen,"fbSize",       (const owl2i&)fbSize);
     owlRayGenSetGroup (rayGen,"world",        world);
-    owlRayGenSet3f    (rayGen,"camera.pos",   (const owl3f&)camera.lens.center);
-    owlRayGenSet3f    (rayGen,"camera.dir_00",(const owl3f&)camera_d00);
-    owlRayGenSet3f    (rayGen,"camera.dir_du",(const owl3f&)camera.lens.du);
-    owlRayGenSet3f    (rayGen,"camera.dir_dv",(const owl3f&)camera.lens.dv);
+    OnCameraChange();
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -197,12 +183,36 @@ void Renderer::Shutdown()
 }
 
 
-void Renderer::UpdateCamera()
+void Renderer::OnCameraChange()
 {
-  vec3f camera_d00
-        = normalize(lookAt-camera.lens.center);
-  owlRayGenSet3f    (rayGen,"camera.pos",   (const owl3f&)camera.lens.center);
-  owlRayGenSet3f    (rayGen,"camera.dir_00",(const owl3f&)camera_d00);
-  owlRayGenSet3f    (rayGen,"camera.dir_du",(const owl3f&)camera.lens.du);
-  owlRayGenSet3f    (rayGen,"camera.dir_dv",(const owl3f&)camera.lens.dv);
+  const vec3f lookFrom = camera.getFrom();
+  const vec3f lookAt = camera.getAt();
+  const vec3f lookUp = camera.getUp();
+  const float cosFovy = camera.getCosFovy();
+  const float vfov = toDegrees(acosf(cosFovy));
+  // ........... compute variable values  ..................
+  const vec3f vup = lookUp;
+  const float aspect = fbSize.x / float(fbSize.y);
+  const float theta = vfov * ((float)M_PI) / 180.0f;
+  const float half_height = tanf(theta / 2.0f);
+  const float half_width = aspect * half_height;
+  const float focusDist = 10.f;
+  const vec3f origin = lookFrom;
+  const vec3f w = normalize(lookFrom - lookAt);
+  const vec3f u = normalize(cross(vup, w));
+  const vec3f v = cross(w, u);
+  const vec3f lower_left_corner
+      = origin - half_width * focusDist * u - half_height * focusDist * v - focusDist * w;
+  const vec3f horizontal = 2.0f * half_width * focusDist * u;
+  const vec3f vertical = 2.0f * half_height * focusDist * v;
+
+  //accumID = 0;
+
+  // ----------- set variables  ----------------------------
+  owlRayGenSetGroup(rayGen, "world", world);
+  owlRayGenSet3f(rayGen, "camera.org", (const owl3f&)origin);
+  owlRayGenSet3f(rayGen, "camera.llc", (const owl3f&)lower_left_corner);
+  owlRayGenSet3f(rayGen, "camera.horiz", (const owl3f&)horizontal);
+  owlRayGenSet3f(rayGen, "camera.vert", (const owl3f&)vertical);
+}
 }

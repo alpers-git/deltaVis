@@ -1,6 +1,8 @@
 #pragma once
 // public owl node-graph API
 #include "owl/owl.h"
+#include "Camera.h"
+//#include "CameraManipulator.h"
 #include "DeviceCode.h"
 
 const vec2i fbSize(800,600);
@@ -10,24 +12,8 @@ const vec3f lookUp(0.f,1.f,0.f);
 const float cosFovy = 0.66f;
 
 
-struct SimpleCamera
+namespace deltaVis
 {
-    inline SimpleCamera() {}
-    //SimpleCamera(const SimpleCamera &camera);
-
-    struct {
-    vec3f lower_left;
-    vec3f horizontal;
-    vec3f vertical;
-    } screen;
-    struct {
-    vec3f center;
-    vec3f du;
-    vec3f dv;
-    float radius { 0.f };
-    } lens;
-};
-
 class Renderer
 {
 public:
@@ -38,9 +24,9 @@ public:
     void Render();
     void Shutdown();
 
-    void UpdateCamera();
+    void OnCameraChange();
 
-    SimpleCamera camera;
+    Camera camera;
 
     OWLRayGen  rayGen  { 0 };
     OWLContext context { 0 };
@@ -56,3 +42,5 @@ public:
     OWLGeomType trianglesGeomType;
     vec2i fbSize = vec2i(800,600);
 };
+
+}

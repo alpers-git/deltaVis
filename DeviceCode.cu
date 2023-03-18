@@ -14,11 +14,13 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)()
   const vec2f screen = (vec2f(pixelID)+vec2f(.5f)) / vec2f(self.fbSize);
   owl::Ray ray;
   ray.origin    
-    = self.camera.pos;
-  ray.direction 
-    = normalize(self.camera.dir_00
-                + screen.u * self.camera.dir_du
-                + screen.v * self.camera.dir_dv);
+    = self.camera.origin;
+  const vec3f direction
+      = self.camera.lower_left_corner
+      + screen.u * self.camera.horizontal
+      + screen.v * self.camera.vertical
+      - self.camera.origin;
+  ray.direction = normalize(direction);
 
   vec3f color;
   owl::traceRay(/*accel to trace against*/self.world,

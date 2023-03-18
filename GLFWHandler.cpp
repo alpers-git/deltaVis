@@ -52,8 +52,8 @@ void GLFWHandler::SetCallbacks()
 {
     glfwSetCursorPosCallback(window, [](GLFWwindow *window, double x, double y) {
         auto glfw = GLFWHandler::getInstance();
-        glfw->mouseState.mouseDelta = owl::vec2f(x, y) - glfw->mouseState.mousePos;
-        glfw->mouseState.mousePos = owl::vec2f(x, y);
+        glfw->mouseState.delta = owl::vec2f(x, y) - glfw->mouseState.position;
+        glfw->mouseState.position = owl::vec2f(x, y);
     });
 
     glfwSetMouseButtonCallback(window, [](GLFWwindow *window, int button, int action, int mods) {
@@ -85,12 +85,18 @@ void GLFWHandler::swapBuffers()
 
 void GLFWHandler::pollEvents()
 {
+    GLFWHandler::getInstance()->mouseState.delta = owl::vec2f(0, 0);
     glfwPollEvents();
 }
 
 int GLFWHandler::windowShouldClose()
 {
     return glfwWindowShouldClose(window);
+}
+
+owl::vec2i GLFWHandler::getWindowSize()
+{
+    return winSize;
 }
 
 void *GLFWHandler::getWindowUserPointer()

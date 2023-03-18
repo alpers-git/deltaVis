@@ -3,6 +3,8 @@
 #include "GL/gl.h"
 #include "GLFWHandler.h"
 // our device-side data structures
+
+#include "CameraManipulator.h"
 #include "DeviceCode.h"
 #include "Renderer.h"
 #include <owl/owl.h>
@@ -17,6 +19,8 @@
 
 const char *outFileName = "s01-simpleTriangles";
 
+using namespace deltaVis;
+
 int main(int ac, char **av)
 {
   // create a context on the first device:
@@ -30,6 +34,7 @@ int main(int ac, char **av)
   // create a window and a GL context
   auto glfw = GLFWHandler::getInstance();
   glfw->initWindow(renderer.fbSize.x, renderer.fbSize.y, "DeltaVisViewer");
+  CameraManipulator controller = CameraManipulator(&renderer.camera);
 
   int fCount = 0;
   while(!glfw->windowShouldClose())
@@ -39,16 +44,6 @@ int main(int ac, char **av)
     const uint32_t *fb
         = (const uint32_t*)owlBufferGetPointer(renderer.frameBuffer,0);
 
-    float mouseDeltaX = glfw->mouseState.mouseDelta.x;
-    float mouseDeltaY = glfw->mouseState.mouseDelta.y;
-
-    if(glfw->mouseState.leftButtonDown)
-    {
-      renderer.camera.lens.center += renderer.camera.lens.du * mouseDeltaX;
-      renderer.camera.lens.center += renderer.camera.lens.dv * mouseDeltaY;
-      renderer.UpdateCamera();
-    }
-    
     //draw the frame to the window
     glfw->draw((void*)fb);
 
@@ -60,6 +55,8 @@ int main(int ac, char **av)
 
     glfw->swapBuffers();
     glfw->pollEvents();
+    controller.ProcessEvents();
+    renderer.OnCameraChange();
   }
   renderer.Shutdown();
   glfw->destroyWindow();
