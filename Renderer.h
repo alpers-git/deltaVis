@@ -6,6 +6,9 @@
 #include "DeviceCode.h"
 #include "GLFWHandler.h"
 
+#include <umesh/io/UMesh.h>
+
+
 const vec3f lookFrom(-4.f,-3.f,-2.f);
 const vec3f lookAt(0.f,0.f,0.f);
 const vec3f lookUp(0.f,1.f,0.f);
@@ -17,7 +20,7 @@ namespace deltaVis
 class Renderer
 {
 public:
-    Renderer();
+    Renderer(std::shared_ptr<umesh::UMesh> umesh);
     ~Renderer();
 
     void Init();
@@ -29,6 +32,8 @@ public:
 
     void OnCameraChange();
 
+    std::shared_ptr<umesh::UMesh> umeshPtr;
+
     Camera camera;
     CameraManipulator* controller;
 
@@ -38,12 +43,27 @@ public:
     OWLBuffer  accumBuffer { 0 };
     int        accumID     { 0 };
     OWLModule module;
-    OWLBuffer frameBuffer;
-    OWLBuffer vertexBuffer;
-    OWLBuffer indexBuffer;
     OWLGeom trianglesGeom;
     OWLGroup trianglesGroup;
-    OWLGeomType trianglesGeomType;
+
+    OWLGeomType tetrahedraType;
+    OWLGeomType pyramidType;
+    OWLGeomType wedgeType;
+    OWLGeomType hexahedraType;
+
+    OWLGeomType triangleType;
+
+    OWLBuffer  tetrahedraData;
+    OWLBuffer  pyramidsData;
+    OWLBuffer  hexahedraData;
+    OWLBuffer  wedgesData;
+    OWLBuffer  verticesData;
+    OWLBuffer  scalarData;
+
+    OWLBuffer vertexBuffer;
+    OWLBuffer indexBuffer;
+    OWLBuffer frameBuffer;
+
     vec2i fbSize = vec2i(800,600);
 };
 

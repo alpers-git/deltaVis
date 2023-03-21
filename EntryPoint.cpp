@@ -50,7 +50,7 @@ int main(int ac, char **av)
   glfw->initWindow(800, 800, "DeltaVisViewer");
 
   // create a context on the first device:
-  Renderer renderer;
+  Renderer renderer(umeshHdlPtr);
   renderer.Init();
 
   renderer.Resize(vec2i(800, 800));
