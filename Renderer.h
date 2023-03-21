@@ -2,10 +2,10 @@
 // public owl node-graph API
 #include "owl/owl.h"
 #include "Camera.h"
-//#include "CameraManipulator.h"
+#include "CameraManipulator.h"
 #include "DeviceCode.h"
+#include "GLFWHandler.h"
 
-const vec2i fbSize(800,600);
 const vec3f lookFrom(-4.f,-3.f,-2.f);
 const vec3f lookAt(0.f,0.f,0.f);
 const vec3f lookUp(0.f,1.f,0.f);
@@ -22,11 +22,15 @@ public:
 
     void Init();
     void Render();
+    void Update();
+    void Resize(const vec2i newSize);
+
     void Shutdown();
 
     void OnCameraChange();
 
     Camera camera;
+    CameraManipulator* controller;
 
     OWLRayGen  rayGen  { 0 };
     OWLContext context { 0 };

@@ -1,10 +1,8 @@
 #include <stdio.h>
 
 #include "GL/gl.h"
-#include "GLFWHandler.h"
 // our device-side data structures
 
-#include "CameraManipulator.h"
 #include "DeviceCode.h"
 #include "Renderer.h"
 #include <owl/owl.h>
@@ -24,18 +22,22 @@ using namespace deltaVis;
 int main(int ac, char **av)
 {
   stbi_flip_vertically_on_write(true);
+
+  // create a window and a GL context
+  auto glfw = GLFWHandler::getInstance();
+  glfw->initWindow(800, 800, "DeltaVisViewer");
+
   // create a context on the first device:
   Renderer renderer;
   renderer.Init();
 
+  renderer.Resize(vec2i(800, 800));
+  int x, y;
+  x = y = 800;
+
   // ##################################################################
   // now that everything is ready: launch it ....
   // ##################################################################
-
-  // create a window and a GL context
-  auto glfw = GLFWHandler::getInstance();
-  glfw->initWindow(renderer.fbSize.x, renderer.fbSize.y, "DeltaVisViewer");
-  CameraManipulator controller = CameraManipulator(&renderer.camera);
 
   int fCount = 0;
   while(!glfw->windowShouldClose())
@@ -59,10 +61,13 @@ int main(int ac, char **av)
                     fb,renderer.fbSize.x*sizeof(uint32_t));
     fCount++;
 
+    //glfw->setWindowSize(x, y);
+    //renderer.Resize(owl::vec2i(x, y));
+    //x = y++;
+
     glfw->swapBuffers();
     glfw->pollEvents();
-    controller.ProcessEvents();
-    renderer.OnCameraChange();
+    renderer.Update();
   }
   renderer.Shutdown();
   glfw->destroyWindow();

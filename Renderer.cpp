@@ -158,6 +158,9 @@ void Renderer::Init()
     owlRayGenSetBuffer(rayGen,"fbPtr",        frameBuffer);
     owlRayGenSet2i    (rayGen,"fbSize",       (const owl2i&)fbSize);
     owlRayGenSetGroup (rayGen,"world",        world);
+
+    //set up camera controller
+    controller = new CameraManipulator(&camera);
     OnCameraChange();
 
     // ##################################################################
@@ -176,12 +179,29 @@ void Renderer::Render()
         //const uint32_t *fb = (const uint32_t*)owlBufferGetPointer(frameBuffer,0);
 }
 
+void Renderer::Update()
+{
+    if (controller->ProcessEvents())
+      OnCameraChange();
+
+    auto glfw = GLFWHandler::getInstance();
+    if(glfw->getWindowSize() != fbSize)
+      Resize(glfw->getWindowSize());
+}
+
 void Renderer::Shutdown()
 {
     LOG("destroying devicegroup ...");
     owlContextDestroy(context);
 }
 
+void Renderer::Resize(const vec2i newSize)
+{
+    fbSize = newSize;
+    owlBufferResize(frameBuffer,fbSize.x*fbSize.y);
+    owlRayGenSet2i    (rayGen,"fbSize",       (const owl2i&)fbSize);
+    OnCameraChange();
+}
 
 void Renderer::OnCameraChange()
 {

@@ -22,23 +22,28 @@ CameraManipulator::~CameraManipulator()
 {
 }
 
-void CameraManipulator::ProcessEvents()
+bool CameraManipulator::ProcessEvents()
 {
+    bool eventOccured = false;
     auto glfw = GLFWHandler::getInstance();
     if(glfw->mouseState.leftButtonDown)
     {
         mouseDragLeft(owl::vec2i(glfw->mouseState.position), owl::vec2i(glfw->mouseState.delta));
+        eventOccured = true;
     }
 
     if(glfw->mouseState.rightButtonDown)
     {
         mouseDragRight(owl::vec2i(glfw->mouseState.position), owl::vec2i(glfw->mouseState.delta));
+        eventOccured = true;
     }
 
     if(glfw->mouseState.middleButtonDown)
     {
         mouseDragCenter(owl::vec2i(glfw->mouseState.position), owl::vec2i(glfw->mouseState.delta));
+        eventOccured = true;
     }
+    return eventOccured;
 }
 
 void CameraManipulator::rotate(const float deg_u, const float deg_v)

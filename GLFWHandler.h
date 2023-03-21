@@ -11,6 +11,46 @@
 #include <cuda_gl_interop.h>
 #include "owl/helper/cuda.h"
 
+//#define DO_GL_CHECK
+#ifdef DO_GL_CHECK
+#    define GL_CHECK( call )                                            \
+    do                                                                  \
+      {                                                                 \
+        call;                                                           \
+        GLenum err = glGetError();                                      \
+        if( err != GL_NO_ERROR )                                        \
+          {                                                             \
+            std::stringstream ss;                                       \
+            ss << "GL error " <<  getGLErrorString( err ) << " at "     \
+               << __FILE__  << "(" <<  __LINE__  << "): " << #call      \
+               << std::endl;                                            \
+            std::cerr << ss.str() << std::endl;                         \
+            throw std::runtime_error( ss.str().c_str() );               \
+          }                                                             \
+      }                                                                 \
+    while (0)
+
+
+#    define GL_CHECK_ERRORS( )                                          \
+    do                                                                  \
+      {                                                                 \
+        GLenum err = glGetError();                                      \
+        if( err != GL_NO_ERROR )                                        \
+          {                                                             \
+            std::stringstream ss;                                       \
+            ss << "GL error " <<  getGLErrorString( err ) << " at "     \
+               << __FILE__  << "(" <<  __LINE__  << ")";                \
+            std::cerr << ss.str() << std::endl;                         \
+            throw std::runtime_error( ss.str().c_str() );               \
+          }                                                             \
+      }                                                                 \
+    while (0)
+
+#else
+#    define GL_CHECK( call )   do { call; } while(0)
+#    define GL_CHECK_ERRORS( ) do { ;     } while(0)
+#endif
+
 
 class GLFWHandler
 {
@@ -25,6 +65,8 @@ class GLFWHandler
         void* getWindowUserPointer();
         owl::vec2i getWindowSize();
         void draw(const void* fbpointer);
+
+        void setWindowSize(int width, int height);
 
 
         struct MouseState {

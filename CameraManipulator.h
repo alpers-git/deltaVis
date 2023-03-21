@@ -14,7 +14,7 @@ public:
     CameraManipulator(Camera *camera);
     ~CameraManipulator();
 
-    void ProcessEvents();
+    bool ProcessEvents();
 
 private:
     /*! helper function: rotate camera frame by given degrees, then

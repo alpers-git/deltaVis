@@ -79,6 +79,25 @@ void GLFWHandler::SetCallbacks()
         else
             glfw->key.keys.erase(key);
     });
+
+    glfwSetFramebufferSizeCallback(window, [](GLFWwindow *window, int width, int height) {
+        auto glfw = GLFWHandler::getInstance();
+        glfw->winSize = owl::vec2i(width, height);
+
+        if (glfw->fbTexture == 0) 
+        {
+            GL_CHECK(glGenTextures(1, &(glfw->fbTexture)));
+        }
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, glfw->fbTexture));
+        GL_CHECK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                    GL_UNSIGNED_BYTE, nullptr));
+        //glViewport(0, 0, width, height);
+    });
+}
+
+void GLFWHandler::setWindowSize(int width, int height)
+{
+    glfwSetWindowSize(window, width, height);
 }
 
 void GLFWHandler::destroyWindow()
@@ -134,9 +153,9 @@ void GLFWHandler::draw(const void *fbPointer)
     }
     else
     {
-        (glBindTexture(GL_TEXTURE_2D, fbTexture));
-        glEnable(GL_TEXTURE_2D);
-        (glTexSubImage2D(GL_TEXTURE_2D, 0,
+        GL_CHECK(glBindTexture(GL_TEXTURE_2D, fbTexture));
+        GL_CHECK(glEnable(GL_TEXTURE_2D));
+        GL_CHECK(glTexSubImage2D(GL_TEXTURE_2D, 0,
                          0, 0,
                          winSize.x, winSize.y,
                          GL_RGBA, GL_UNSIGNED_BYTE, fbPointer));
@@ -147,6 +166,7 @@ void GLFWHandler::draw(const void *fbPointer)
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+
 
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, fbTexture);
