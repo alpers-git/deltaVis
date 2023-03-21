@@ -26,8 +26,9 @@ set_property(TARGET glfw PROPERTY FOLDER "submodules/GLFW3" )
 #umesh
 add_subdirectory(submodules/umesh)
 add_definitions(${UMESH_DEFINITIONS})
-include_directories(${UMESH_INCLUDES}
-  submodules/glfw/include)
+include_directories(${UMESH_INCLUDES})
+
+include_directories(submodules/glfw/include)
 
 embed_ptx(
   OUTPUT_TARGET
@@ -57,7 +58,7 @@ target_link_libraries(deltaVisViewer PRIVATE
     deviceCode_ptx
     PRIVATE ${OPENGL_LIBRARIES}
     owl::owl
-    PRIVATE glfw
+    glfw
     ${UMESH_LIBRARIES})
 
 
