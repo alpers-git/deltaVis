@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <chrono>
 
 #include "GL/gl.h"
 // our device-side data structures
@@ -11,17 +12,38 @@
 #include <cuda_gl_interop.h>
 #include "owl/helper/cuda.h"
 
+// for data importing data sets
+#include "umesh/io/UMesh.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-
-
-const char *outFileName = "s01-simpleTriangles";
 
 using namespace deltaVis;
 
 int main(int ac, char **av)
 {
+  // this is needed for stb_image_write to work properly
   stbi_flip_vertically_on_write(true);
+
+  // read the input file from cmd line
+  if (ac < 2)
+  {
+    std::cout << "Usage: DeltaVisViewer <input file>" << std::endl;
+    return 0;
+  }
+  std::string inputFileName = av[1];
+  std::cout<< "loading " << inputFileName << std::endl;
+  auto start = std::chrono::high_resolution_clock::now();
+  auto umeshHdlPtr = umesh::io::loadBinaryUMesh(inputFileName);
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+  std::cout << "Time taken by function: "<< duration.count() << " milliseconds" << std::endl;
+  std::cout<< "found " << umeshHdlPtr->tets.size() << " tetrahedra" << std::endl;
+  std::cout<< "found " << umeshHdlPtr->pyrs.size() << " pyramids" << std::endl;
+  std::cout<< "found " << umeshHdlPtr->wedges.size() << " wedges" << std::endl;
+  std::cout<< "found " << umeshHdlPtr->hexes.size() << " hexahedra" << std::endl;
+  std::cout<< "found " << umeshHdlPtr->vertices.size() << " vertices" << std::endl;
+
 
   // create a window and a GL context
   auto glfw = GLFWHandler::getInstance();
@@ -40,30 +62,29 @@ int main(int ac, char **av)
   // ##################################################################
 
   int fCount = 0;
-  while(!glfw->windowShouldClose())
+  while (!glfw->windowShouldClose())
   {
-    //render the frame
+    // render the frame
     renderer.Render();
-    const uint32_t *fb
-        = (const uint32_t*)owlBufferGetPointer(renderer.frameBuffer,0);
+    const uint32_t *fb = (const uint32_t *)owlBufferGetPointer(renderer.frameBuffer, 0);
 
-    //draw the frame to the window
-    glfw->draw((void*)fb);
+    // draw the frame to the window
+    glfw->draw((void *)fb);
 
     assert(fb);
-    
+
     // if(glfw->key.isPressed(GLFW_KEY_ESCAPE))
     //   glfw->setWindowShouldClose(true);
 
-    //Taking a snapshot of the current frame
-    if(glfw->key.isPressed(GLFW_KEY_1) && glfw->key.isDown(GLFW_KEY_RIGHT_SHIFT)) //!
-      stbi_write_png(std::string("frame.png").c_str(),renderer.fbSize.x,renderer.fbSize.y,4,
-                    fb,renderer.fbSize.x*sizeof(uint32_t));
+    // Taking a snapshot of the current frame
+    if (glfw->key.isPressed(GLFW_KEY_1) && glfw->key.isDown(GLFW_KEY_RIGHT_SHIFT)) //!
+      stbi_write_png(std::string("frame.png").c_str(), renderer.fbSize.x, renderer.fbSize.y, 4,
+                     fb, renderer.fbSize.x * sizeof(uint32_t));
     fCount++;
 
-    //glfw->setWindowSize(x, y);
-    //renderer.Resize(owl::vec2i(x, y));
-    //x = y++;
+    // glfw->setWindowSize(x, y);
+    // renderer.Resize(owl::vec2i(x, y));
+    // x = y++;
 
     glfw->swapBuffers();
     glfw->pollEvents();
