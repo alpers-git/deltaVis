@@ -4,11 +4,16 @@
 #include <owl/common/math/vec.h>
 #include "owl/common/math/random.h"
 
+#include "UnstructuredElementHelpers.h"
+
 #include "cuda_fp16.h"
 
 #include <cuda_runtime.h>
 
 using namespace owl;
+
+#define ELEMENTS_PER_BOX 1u
+
 
 /* variables for the triangle mesh geometry */
 struct TriangleData
@@ -38,11 +43,11 @@ struct UnstructuredElementData {
     half* bboxes;
 
     // for culling elements during build
-    cudaTextureObject_t xf;
-    int numTexels;
-    float2 volumeDomain;
-    float2 xfDomain;
-    float opacityScale;
+    // cudaTextureObject_t xf;
+    // int numTexels;
+    // float2 volumeDomain;
+    // float2 xfDomain;
+    // float opacityScale;
   };
 
 

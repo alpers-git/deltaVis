@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
-project(deltaVis VERSION 1.0.4 LANGUAGES C CXX CUDA)
+project(deltaVis LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -25,8 +25,8 @@ set_property(TARGET glfw PROPERTY FOLDER "submodules/GLFW3" )
 
 #umesh
 add_subdirectory(submodules/umesh EXCLUDE_FROM_ALL)
-# add_definitions(${UMESH_DEFINITIONS})
-# include_directories(${UMESH_INCLUDES})
+add_definitions(${UMESH_DEFINITIONS})
+include_directories(${UMESH_INCLUDES})
 
 include_directories(submodules/glfw/include)
 
@@ -41,7 +41,6 @@ embed_ptx(
     DeviceCode.cu
 )
 
-
 add_executable(deltaVisViewer
     EntryPoint.cpp
     Renderer.h
@@ -52,9 +51,11 @@ add_executable(deltaVisViewer
     Camera.cpp
     CameraManipulator.h
     CameraManipulator.cpp
+    UnstructuredElementHelpers.h
     stb_image_write.h
 )
-target_link_libraries(deltaVisViewer PRIVATE 
+target_link_libraries(deltaVisViewer 
+    PRIVATE 
     deviceCode_ptx
     PRIVATE ${OPENGL_LIBRARIES}
     owl::owl

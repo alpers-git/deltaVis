@@ -43,6 +43,12 @@ public:
     OWLBuffer  accumBuffer { 0 };
     int        accumID     { 0 };
     OWLModule module;
+    
+    std::vector<OWLGeom> elementGeom;
+    std::vector<OWLGroup> elementBLAS;
+    OWLGroup elementTLAS;
+
+
     OWLGeom trianglesGeom;
     OWLGroup trianglesGroup;
 
