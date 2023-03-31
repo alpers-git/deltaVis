@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include "MacrocellBuilder.h"
 
 #define LOG(message)                                          \
   std::cout << OWL_TERMINAL_BLUE;                             \
@@ -157,16 +158,7 @@ namespace deltaVis
     verticesData = owlDeviceBufferCreate(context, OWL_FLOAT3, umeshPtr->vertices.size(), nullptr);
     scalarData = owlDeviceBufferCreate(context, OWL_FLOAT, umeshPtr->perVertex->values.size(), nullptr);
     // Upload data
-    //go over indices of tets and write them in a flat int vector
-    std::vector<unsigned int> tetsIndices;
-    for (auto &tet : umeshPtr->tets)
-    {
-      tetsIndices.push_back(tet[0]);
-      tetsIndices.push_back(tet[1]);
-      tetsIndices.push_back(tet[2]);
-      tetsIndices.push_back(tet[3]);
-    }
-    owlBufferUpload(tetrahedraData, tetsIndices.data());
+    owlBufferUpload(tetrahedraData,  umeshPtr->tets.data());
     owlBufferUpload(pyramidsData, umeshPtr->pyrs.data());
     owlBufferUpload(wedgesData, umeshPtr->wedges.data());
     owlBufferUpload(hexahedraData, umeshPtr->hexes.data());

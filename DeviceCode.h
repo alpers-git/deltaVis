@@ -63,7 +63,7 @@ struct RayGenData
 
       int   numModes;
       int   mode;
-      int numAdaptiveSamplingRays;
+      int   numAdaptiveSamplingRays;
       float dt;
 
     } volume;
@@ -79,7 +79,7 @@ struct RayGenData
 struct RayPayload {
     float t0;
     float t1;
-    //Random random;
+    owl::common::LCG<4> rng;//random number generator
     vec4f rgba;
     float dataMax;
     float dataMin;
