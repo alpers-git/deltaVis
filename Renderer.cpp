@@ -33,7 +33,7 @@ OWLVarDecl rayGenVars[] = {
     // framebuffer
     {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(RayGenData, fbPtr)},
     {"fbSize", OWL_INT2, OWL_OFFSETOF(RayGenData, fbSize)},
-    {"world", OWL_GROUP, OWL_OFFSETOF(RayGenData, world)},
+    {"triangleTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, triangleTLAS)},
     // camera
     {"camera.org", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.origin)},
     {"camera.llc", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.lower_left_corner)},
@@ -41,6 +41,9 @@ OWLVarDecl rayGenVars[] = {
     {"camera.vert", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.vertical)},
     // Volume data
     {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.elementTLAS)},
+    {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.macrocellTLAS)},
+    {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(RayGenData, volume.macrocellDims)},
+    //{"volume.mecrocells"}
     {/* sentinel to mark end of list */}};
 namespace deltaVis
 {
@@ -111,8 +114,14 @@ namespace deltaVis
         {"indices", OWL_BUFPTR, OWL_OFFSETOF(TriangleData, indices)},
         {"color", OWL_FLOAT3, OWL_OFFSETOF(TriangleData, color)},
         {/* sentinel to mark end of list */}};
+    
+    OWLVarDecl macrocellVars[] = {
+        {"bboxes", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, bboxes)},
+        //{"maxima", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, maxima)},
+        {/* sentinel to mark end of list */}};
 
     // Declare the geometry types
+    macrocellType = owlGeomTypeCreate(context, OWL_GEOM_USER, sizeof(MacrocellData), macrocellVars, -1);
     tetrahedraType = owlGeomTypeCreate(context, OWL_GEOM_USER, sizeof(UnstructuredElementData), unstructuredElementVars, -1);
     pyramidType = owlGeomTypeCreate(context, OWL_GEOM_USER, sizeof(UnstructuredElementData), unstructuredElementVars, -1);
     wedgeType = owlGeomTypeCreate(context, OWL_GEOM_USER, sizeof(UnstructuredElementData), unstructuredElementVars, -1);
@@ -120,6 +129,7 @@ namespace deltaVis
     triangleType = owlGeomTypeCreate(context, OWL_GEOMETRY_TRIANGLES, sizeof(TriangleData), triangleVars, -1);
 
     // Set intersection programs
+    //owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 0, module, "MacrocellPointQuery");
     owlGeomTypeSetIntersectProg(tetrahedraType, /*ray type */ 0, module, "TetrahedraPointQuery");
     // owlGeomTypeSetIntersectProg(pyramidType, /*ray type */ 0, module, "PyramidPointQuery");
     // owlGeomTypeSetIntersectProg(wedgeType, /*ray type */ 0, module, "WedgePointQuery");
@@ -130,8 +140,10 @@ namespace deltaVis
     // owlGeomTypeSetBoundsProg(pyramidType, module, "PyramidBounds");
     // owlGeomTypeSetBoundsProg(wedgeType, module, "WedgeBounds");
     // owlGeomTypeSetBoundsProg(hexahedraType, module, "HexahedraBounds");
+    owlGeomTypeSetBoundsProg(macrocellType, module, "MacrocellBounds");
 
     owlGeomTypeSetClosestHit(triangleType, 0, module, "TriangleClosestHit");
+    owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"DeltaTracking");
 
     owlBuildPrograms(context);
     // owlBuildPipeline(context);
@@ -148,7 +160,7 @@ namespace deltaVis
     // ----------- set variables  ----------------------------
     owlRayGenSetBuffer(rayGen, "fbPtr", frameBuffer);
     owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
-    owlRayGenSetGroup(rayGen, "world", world);
+    owlRayGenSetGroup(rayGen, "triangleTLAS", triangleTLAS);
 
     // Allocate buffers
     tetrahedraData = owlDeviceBufferCreate(context, OWL_INT, umeshPtr->tets.size() * 4, nullptr);
@@ -158,12 +170,31 @@ namespace deltaVis
     verticesData = owlDeviceBufferCreate(context, OWL_FLOAT3, umeshPtr->vertices.size(), nullptr);
     scalarData = owlDeviceBufferCreate(context, OWL_FLOAT, umeshPtr->perVertex->values.size(), nullptr);
     // Upload data
-    owlBufferUpload(tetrahedraData,  umeshPtr->tets.data());
+    owlBufferUpload(tetrahedraData, umeshPtr->tets.data());
     owlBufferUpload(pyramidsData, umeshPtr->pyrs.data());
     owlBufferUpload(wedgesData, umeshPtr->wedges.data());
     owlBufferUpload(hexahedraData, umeshPtr->hexes.data());
     owlBufferUpload(verticesData, umeshPtr->vertices.data());
     owlBufferUpload(scalarData, umeshPtr->perVertex->values.data());
+
+    box4f *grid = BuildMacrocellGrid({3, 3, 3}, umeshPtr->vertices.data(),
+                                     umeshPtr->perVertex->values.data(), umeshPtr->vertices.size());
+    OWLBuffer bboxBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
+    owlBufferUpload(bboxBuffer, grid);
+    OWLGeom userGeom = owlGeomCreate(context, macrocellType);
+    owlGeomSetPrimCount(userGeom, numMacrocells);
+    //owlGeomSet1i(userGeom, "offset", 0);
+    //owlGeomSetBuffer(userGeom, "maxima", nullptr);
+    owlGeomSetBuffer(userGeom, "bboxes", bboxBuffer);
+
+    auto macrocellBLAS = owlUserGeomGroupCreate(context, 1, &userGeom, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+    owlGroupBuildAccel(macrocellBLAS);
+    macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS);
+    owlGroupBuildAccel(macrocellTLAS);
+    owlRayGenSetGroup(rayGen, "volume.macrocellTLAS", macrocellTLAS);
+    
+    delete[] grid;
+    //cudaDeviceSynchronize();
 
     if (umeshPtr->tets.size() > 0)
     {
@@ -272,17 +303,15 @@ namespace deltaVis
     // the group/accel for that mesh (for surfaces)
     trianglesGroup = owlTrianglesGeomGroupCreate(context, 1, &trianglesGeom);
     owlGroupBuildAccel(trianglesGroup);
-    world = owlInstanceGroupCreate(context, 1, &trianglesGroup);
-    owlGroupBuildAccel(world);
+    triangleTLAS = owlInstanceGroupCreate(context, 1, &trianglesGroup);
+    owlGroupBuildAccel(triangleTLAS);
     // owlParamsSetGroup(lp, "trianglesTLAS", trianglesTLAS);
 
     // go over the vertices of the scene calculate the bounding box and find the center
     auto center = umeshPtr->getBounds().center();
     vec3f eye = vec3f(center.x, center.y, center.z + 2.5f * (umeshPtr->getBounds().upper.z - umeshPtr->getBounds().lower.z));
     camera.setOrientation(eye, vec3f(center.x, center.y, center.z), vec3f(0, 1, 0), 45.0f);
-    camera.motionSpeed = 10.f;
-
-    printf("data bounds size = %f %f %f\n", umeshPtr->getBounds().size().x, umeshPtr->getBounds().size().y, umeshPtr->getBounds().size().z);
+    camera.motionSpeed = 20.f;
 
     // set up camera controller
     controller = new CameraManipulator(&camera);
@@ -353,7 +382,7 @@ namespace deltaVis
     // accumID = 0;
 
     // ----------- set variables  ----------------------------
-    owlRayGenSetGroup(rayGen, "world", world);
+    owlRayGenSetGroup(rayGen, "triangleTLAS", triangleTLAS);
     owlRayGenSet3f(rayGen, "camera.org", (const owl3f &)origin);
     owlRayGenSet3f(rayGen, "camera.llc", (const owl3f &)lower_left_corner);
     owlRayGenSet3f(rayGen, "camera.horiz", (const owl3f &)horizontal);

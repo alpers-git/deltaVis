@@ -39,19 +39,22 @@ public:
 
     OWLRayGen  rayGen  { 0 };
     OWLContext context { 0 };
-    OWLGroup   world   { 0 };
+    OWLGroup   triangleTLAS   { 0 };
     OWLBuffer  accumBuffer { 0 };
     int        accumID     { 0 };
     OWLModule module;
-    
+
     std::vector<OWLGeom> elementGeom;
     std::vector<OWLGroup> elementBLAS;
     OWLGroup elementTLAS;
+    //OWLGroup rootMacrocellBLAS;
+    OWLGroup macrocellTLAS;
 
 
     OWLGeom trianglesGeom;
     OWLGroup trianglesGroup;
 
+    OWLGeomType macrocellType;
     OWLGeomType tetrahedraType;
     OWLGeomType pyramidType;
     OWLGeomType wedgeType;
@@ -71,6 +74,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
+    int numMacrocells = 27;
 };
 
 }

@@ -50,21 +50,31 @@ struct UnstructuredElementData {
     // float opacityScale;
   };
 
+struct MacrocellData {
+      float4* bboxes;
+      //float* maxima;        
+      //int offset; // for pre-split geom
+  };
+
 
 /* variables for the ray generation program */
 struct RayGenData
 {
   uint32_t *fbPtr;
   vec2i  fbSize;
-  OptixTraversableHandle world;
+  OptixTraversableHandle triangleTLAS;
 
   struct {
       OptixTraversableHandle elementTLAS;
+      OptixTraversableHandle macrocellTLAS;
 
       int   numModes;
       int   mode;
       int   numAdaptiveSamplingRays;
       float dt;
+
+      vec3i macrocellDims;
+      //float* macrocells;
 
     } volume;
 
