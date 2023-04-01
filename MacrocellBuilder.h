@@ -65,12 +65,15 @@ namespace deltaVis
                                 scalarMax = scalars[l];
                         }
                     }
-                    // set the bounds for the macrocell
-                    if (i + dims.x * (j + dims.y * k) >= dims.x * dims.y * dims.z)
+                    int idx = (j + k * dims.x) * dims.y + i;
+                    if (idx >= dims.x * dims.y * dims.z)
+                    {
+                        printf("idx out of bounds: %d\n", idx);
                         continue;
-                    grid[i + dims.x * (j + dims.y * k)].extend(
-                        vec4f(x, y, z, scalarMin));
-                    grid[i + dims.x * (j + dims.y * k)].extend(
+                    }
+                    // set the bounds for the macrocell
+                    grid[idx] = box4f(
+                        vec4f(x, y, z, scalarMin),
                         vec4f(x + cellSize.x, y + cellSize.y, z + cellSize.z, scalarMax));
                     k++;
                 }

@@ -4,6 +4,21 @@
 using namespace deltaVis;
 using namespace owl;
 
+inline __device__ void generateRay(const vec2f screen, owl::Ray &ray)
+{
+  auto &self = owl::getProgramData<RayGenData>();
+  ray.origin = self.camera.origin;
+  vec3f direction = self.camera.lower_left_corner +
+      screen.u * self.camera.horizontal +
+      screen.v * self.camera.vertical -
+      self.camera.origin;
+  direction = normalize(direction);
+  if (fabs(direction.x) < 1e-5f) direction.x = 1e-5f;
+  if (fabs(direction.y) < 1e-5f) direction.y = 1e-5f;
+  if (fabs(direction.z) < 1e-5f) direction.z = 1e-5f;
+  ray.direction = normalize(direction);
+}
+
 OPTIX_RAYGEN_PROGRAM(simpleRayGen)
 ()
 {
@@ -17,11 +32,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
 
   const vec2f screen = (vec2f(pixelID) + vec2f(.5f)) / vec2f(self.fbSize);
   owl::Ray ray;
-  ray.origin = self.camera.origin;
-  const vec3f direction = self.camera.lower_left_corner + screen.u * self.camera.horizontal + screen.v * self.camera.vertical - self.camera.origin;
-  ray.direction = normalize(direction);
-  ray.tmin = 0.f;
-  ray.tmax = 1000000.f;
+  generateRay(screen, ray);
 
   RayPayload prd;
   float count = 0;
@@ -31,10 +42,11 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   owl::traceRay(/*accel to trace against*/ self.volume.macrocellTLAS,
                 /*the ray to trace*/ ray,
                 /*prd*/ prd);
-  if(!prd.missed)
+  if (!prd.missed)
     count += 0.1f;
   // map prd.dataValue to color
-  vec3f color = prd.missed ? vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z) : vec3f(count, count, count);
+  //vec3f color = prd.missed ? vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z) : vec3f(count, count, count);
+  vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
   // printf("color: %f %f %f count %f\n", color.x, color.y, color.z, count);
 
   const int fbOfs = pixelID.x + self.fbSize.x * pixelID.y;
@@ -65,7 +77,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
 {
   const MacrocellData &self = owl::getProgramData<MacrocellData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
-  printf("hit delta cell\n");
+  // printf("hit delta cell\n");
   prd.missed = false;
   //   auto &lp = optixLaunchParams;
   //   vec3f origin = vec3f(optixGetWorldRayOrigin());
@@ -147,18 +159,18 @@ OPTIX_BOUNDS_PROGRAM(MacrocellBounds)
     const int primID)
 {
   const MacrocellData &self = *(const MacrocellData *)geomData;
-  //if (self.maxima[primID] <= 0.f) {
-  //   primBounds = box3f(); // empty box
-  // }
-  // else
+  // if (self.maxima[primID] <= 0.f) {
+  //    primBounds = box3f(); // empty box
+  //  }
+  //  else
   {
-    primBounds.lower.x = self.bboxes[(primID *2 + 0)].x;
-    primBounds.lower.y = self.bboxes[(primID *2 + 0)].y;
-    primBounds.lower.z = self.bboxes[(primID *2 + 0)].z;
-    primBounds.upper.x = self.bboxes[(primID *2 + 1)].x;
-    primBounds.upper.y = self.bboxes[(primID *2 + 1)].y;
-    primBounds.upper.z = self.bboxes[(primID *2 + 1)].z;
-    //printf("bounds: %f %f %f %f %f %f\n", primBounds.lower.x, primBounds.lower.y, primBounds.lower.z, primBounds.upper.x, primBounds.upper.y, primBounds.upper.z);
+    primBounds.lower.x = self.bboxes[(primID * 2 + 0)].x;
+    primBounds.lower.y = self.bboxes[(primID * 2 + 0)].y;
+    primBounds.lower.z = self.bboxes[(primID * 2 + 0)].z;
+    primBounds.upper.x = self.bboxes[(primID * 2 + 1)].x;
+    primBounds.upper.y = self.bboxes[(primID * 2 + 1)].y;
+    primBounds.upper.z = self.bboxes[(primID * 2 + 1)].z;
+    printf("bounds: %f %f %f %f %f %f\n", primBounds.lower.x, primBounds.lower.y, primBounds.lower.z, primBounds.upper.x, primBounds.upper.y, primBounds.upper.z);
   }
 }
 
@@ -371,9 +383,9 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
 ()
 {
   // auto &lp = optixLaunchParams;
-  // RayPayload &prd = owl::getPRD<RayPayload>();
-  // const auto &self = owl::getProgramData<MacrocellData>();
-  // const int primID = optixGetPrimitiveIndex() + self.offset;
+  RayPayload &prd = owl::getPRD<RayPayload>();
+  const auto &self = owl::getProgramData<MacrocellData>();
+  const int primID = optixGetPrimitiveIndex();
 
   // // avoid intersecting the same brick twice
   // // if (primID == prd.prevNode) return;
@@ -381,56 +393,51 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   // if (prd.rgba.w > .99f)
   //   return;
 
-  // box4f bbox = self.bboxes[primID];
-  // float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.lower.z);
-  // float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.upper.z);
-  // float3 origin = optixGetObjectRayOrigin();
+  box4f bbox(self.bboxes[primID], self.bboxes[primID + 1]);
+  float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.upper.z);
+  float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.lower.z);
+  float3 origin = optixGetObjectRayOrigin();
+  // note, this is _not_ normalized. Useful for computing world space tmin/mmax
+  float3 direction = optixGetObjectRayDirection();
+  float3 dirfrac;
 
-  // // note, this is _not_ normalized. Useful for computing world space tmin/mmax
-  // float3 direction = optixGetObjectRayDirection();
+  // direction is unit direction vector of ray
+  dirfrac.x = 1.0f / direction.x;
+  dirfrac.y = 1.0f / direction.y;
+  dirfrac.z = 1.0f / direction.z;
 
-  // // float3 rt = make_float3(mx.x(), mx.y(), mx.z() + 1.f);
+  // lb is the corner of AABB with minimal coordinates - left bottom, rt is maximal corner
+  float t0x = (lb.x - origin.x) * dirfrac.x;
+  float t1x = (rt.x - origin.x) * dirfrac.x;
+  float t0y = (lb.y - origin.y) * dirfrac.y;
+  float t1y = (rt.y - origin.y) * dirfrac.y;
+  float t0z = (lb.z - origin.z) * dirfrac.z;
+  float t1z = (rt.z - origin.z) * dirfrac.z;
 
-  // // typical ray AABB intersection test
-  // float3 dirfrac;
+  float3 tmin = make_float3(min(t0x, t1x), min(t0y, t1y), min(t0z, t1z));
+  float3 tmax = make_float3(max(t0x, t1x), max(t0y, t1y), max(t0z, t1z));
 
-  // // direction is unit direction vector of ray
-  // dirfrac.x = 1.0f / direction.x;
-  // dirfrac.y = 1.0f / direction.y;
-  // dirfrac.z = 1.0f / direction.z;
+  float tNear = max(max(tmin.x, tmin.y), tmin.z);
+  float tFar = min(min(tmax.x, tmax.y), tmax.z);
 
-  // // lb is the corner of AABB with minimal coordinates - left bottom, rt is maximal corner
-  // // origin is origin of ray
-  // float t1 = (lb.x - origin.x) * dirfrac.x;
-  // float t2 = (rt.x - origin.x) * dirfrac.x;
-  // float t3 = (lb.y - origin.y) * dirfrac.y;
-  // float t4 = (rt.y - origin.y) * dirfrac.y;
-  // float t5 = (lb.z - origin.z) * dirfrac.z;
-  // float t6 = (rt.z - origin.z) * dirfrac.z;
+  // if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
+  if (tFar < 0) { return; }
 
-  // float thit0 = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
-  // float thit1 = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
 
-  // // if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
-  // if (thit1 < 0)
-  // {
-  //   return;
-  // }
+  // if tmin > tmax, ray doesn't intersect AABB
+  if (tNear > tFar) { return; }
 
-  // // if tmin > tmax, ray doesn't intersect AABB
-  // if (thit0 >= thit1)
-  // {
-  //   return;
-  // }
+  // clip hit to near position
+  tNear = max(tNear, optixGetRayTmin());
 
-  // // clip hit to near position
-  // thit0 = max(thit0, optixGetRayTmin());
 
-  // if (optixReportIntersection(thit0, /* hit kind */ 0))
-  // {
-  //   prd.t0 = max(prd.t0, thit0);
-  //   prd.t1 = min(prd.t1, thit1);
-  // }
+  if (optixReportIntersection(tNear, /* hit kind */ 0))
+  {
+    prd.t0 = max(prd.t0, tNear);
+    prd.t1 = min(prd.t1, tFar);
+    prd.rng.init(bbox.lower.w, bbox.upper.w);
+    prd.rgba = make_float4(prd.rng(),prd.rng(),prd.rng(), 1.f);
+  }
 }
 
 OPTIX_INTERSECT_PROGRAM(TetrahedraPointQuery)

@@ -129,7 +129,7 @@ namespace deltaVis
     triangleType = owlGeomTypeCreate(context, OWL_GEOMETRY_TRIANGLES, sizeof(TriangleData), triangleVars, -1);
 
     // Set intersection programs
-    //owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 0, module, "MacrocellPointQuery");
+    owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 0, module, "VolumeIntersection");
     owlGeomTypeSetIntersectProg(tetrahedraType, /*ray type */ 0, module, "TetrahedraPointQuery");
     // owlGeomTypeSetIntersectProg(pyramidType, /*ray type */ 0, module, "PyramidPointQuery");
     // owlGeomTypeSetIntersectProg(wedgeType, /*ray type */ 0, module, "WedgePointQuery");
@@ -177,21 +177,26 @@ namespace deltaVis
     owlBufferUpload(verticesData, umeshPtr->vertices.data());
     owlBufferUpload(scalarData, umeshPtr->perVertex->values.data());
 
-    box4f *grid = BuildMacrocellGrid({3, 3, 3}, umeshPtr->vertices.data(),
+    int numMacrocells = macrocellDims.x * macrocellDims.y * macrocellDims.z;
+    box4f *grid = BuildMacrocellGrid(macrocellDims, umeshPtr->vertices.data(),
                                      umeshPtr->perVertex->values.data(), umeshPtr->vertices.size());
-    OWLBuffer bboxBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
-    owlBufferUpload(bboxBuffer, grid);
+    for (int i = 0; i < numMacrocells; i++)
+        std::cout << grid[i].lower << " " << grid[i].upper << std::endl;
+    OWLBuffer gridBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
+    owlBufferUpload(gridBuffer, grid);
     OWLGeom userGeom = owlGeomCreate(context, macrocellType);
     owlGeomSetPrimCount(userGeom, numMacrocells);
     //owlGeomSet1i(userGeom, "offset", 0);
     //owlGeomSetBuffer(userGeom, "maxima", nullptr);
-    owlGeomSetBuffer(userGeom, "bboxes", bboxBuffer);
+    owlGeomSetBuffer(userGeom, "bboxes", gridBuffer);
 
     auto macrocellBLAS = owlUserGeomGroupCreate(context, 1, &userGeom, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellBLAS);
     macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS);
     owlGroupBuildAccel(macrocellTLAS);
     owlRayGenSetGroup(rayGen, "volume.macrocellTLAS", macrocellTLAS);
+
+    owlRayGenSet3i(rayGen, "volume.macrocellDims", (const owl3i &)macrocellDims);
     
     delete[] grid;
     //cudaDeviceSynchronize();
