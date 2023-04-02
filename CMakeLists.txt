@@ -23,6 +23,19 @@ add_subdirectory(submodules/glfw)
 set_property(TARGET glfw PROPERTY FOLDER "submodules/GLFW3" )
 #----------------------------------------------#
 
+#--------------------ImGui---------------------#
+# Set where the ImGui files are stored
+set(IMGUI_PATH  submodules/imgui)
+
+# Compile as static library 
+file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp)
+add_library("ImGui" STATIC ${IMGUI_SOURCES}
+            ${IMGUI_PATH}/backends/imgui_impl_glfw.cpp
+            ${IMGUI_PATH}/backends/imgui_impl_opengl3.cpp)
+target_include_directories("ImGui" PUBLIC ${IMGUI_PATH} ${IMGUI_PATH}/backends glfw)
+include_directories(submodules/imgui)
+#---------------------------------------------#
+
 #umesh
 add_subdirectory(submodules/umesh EXCLUDE_FROM_ALL)
 add_definitions(${UMESH_DEFINITIONS})
@@ -60,6 +73,7 @@ target_link_libraries(deltaVisViewer
     PRIVATE ${OPENGL_LIBRARIES}
     owl::owl
     glfw
+    ImGui
     umesh)
 
 

@@ -15,6 +15,10 @@
 // for data importing data sets
 #include "umesh/io/UMesh.h"
 
+#include <imgui.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -32,18 +36,17 @@ int main(int ac, char **av)
     return 0;
   }
   std::string inputFileName = av[1];
-  std::cout<< "loading " << inputFileName << std::endl;
+  std::cout << "loading " << inputFileName << std::endl;
   auto start = std::chrono::high_resolution_clock::now();
   auto umeshHdlPtr = umesh::io::loadBinaryUMesh(inputFileName);
   auto stop = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-  std::cout << "Time taken by function: "<< duration.count() << " milliseconds" << std::endl;
-  std::cout<< "found " << umeshHdlPtr->tets.size() << " tetrahedra" << std::endl;
-  std::cout<< "found " << umeshHdlPtr->pyrs.size() << " pyramids" << std::endl;
-  std::cout<< "found " << umeshHdlPtr->wedges.size() << " wedges" << std::endl;
-  std::cout<< "found " << umeshHdlPtr->hexes.size() << " hexahedra" << std::endl;
-  std::cout<< "found " << umeshHdlPtr->vertices.size() << " vertices" << std::endl;
-
+  std::cout << "Time taken by function: " << duration.count() << " milliseconds" << std::endl;
+  std::cout << "found " << umeshHdlPtr->tets.size() << " tetrahedra" << std::endl;
+  std::cout << "found " << umeshHdlPtr->pyrs.size() << " pyramids" << std::endl;
+  std::cout << "found " << umeshHdlPtr->wedges.size() << " wedges" << std::endl;
+  std::cout << "found " << umeshHdlPtr->hexes.size() << " hexahedra" << std::endl;
+  std::cout << "found " << umeshHdlPtr->vertices.size() << " vertices" << std::endl;
 
   // create a window and a GL context
   auto glfw = GLFWHandler::getInstance();
@@ -56,6 +59,14 @@ int main(int ac, char **av)
   renderer.Resize(vec2i(800, 800));
   int x, y;
   x = y = 800;
+
+  ImGui::CreateContext();
+  ImGuiIO &io = ImGui::GetIO();
+  (void)io;
+
+  ImGui::StyleColorsDark();
+  ImGui_ImplGlfw_InitForOpenGL(glfw->getWindow(), true);
+  ImGui_ImplOpenGL3_Init("#version 130");
 
   // ##################################################################
   // now that everything is ready: launch it ....
@@ -86,6 +97,21 @@ int main(int ac, char **av)
     // renderer.Resize(owl::vec2i(x, y));
     // x = y++;
 
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    //ImGui::Begin("fuck", 0, ImGuiWindowFlags_None);
+
+    // Actual GUI code goes here
+    ImGui::ShowDemoWindow();
+
+    //ImGui::End();
+    ImGui::Render();
+    ImGuiIO &io = ImGui::GetIO();
+    //glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfw->swapBuffers();
     glfw->pollEvents();
     renderer.Update();

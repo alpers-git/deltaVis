@@ -25,6 +25,11 @@ GLFWHandler *GLFWHandler::getInstance()
     return instance;
 }
 
+GLFWwindow* GLFWHandler::getWindow()
+{
+    return window;
+}
+
 void GLFWHandler::initWindow(int width, int height, std::string title)
 {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
