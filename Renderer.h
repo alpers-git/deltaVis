@@ -74,7 +74,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {3,3,3};
+    vec3i macrocellDims = {2,2,2};
 };
 
 }

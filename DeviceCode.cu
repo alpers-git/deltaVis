@@ -4,18 +4,35 @@
 using namespace deltaVis;
 using namespace owl;
 
+#define DEBUG 0
+// create a debug function macro that gets called only for center pixel
+inline __device__ bool dbg()
+{
+#if DEBUG
+  return false;
+#else
+  auto pixelID = vec2i(owl::getLaunchIndex()[0], owl::getLaunchIndex()[1]);
+  return (owl::getProgramData<RayGenData>().fbSize.x / 2 == pixelID.x) &&
+         (owl::getProgramData<RayGenData>().fbSize.y / 2 == pixelID.y);
+#define ACTIVATE_CROSSHAIRS
+#endif
+}
+
 inline __device__ void generateRay(const vec2f screen, owl::Ray &ray)
 {
   auto &self = owl::getProgramData<RayGenData>();
   ray.origin = self.camera.origin;
   vec3f direction = self.camera.lower_left_corner +
-      screen.u * self.camera.horizontal +
-      screen.v * self.camera.vertical -
-      self.camera.origin;
+                    screen.u * self.camera.horizontal +
+                    screen.v * self.camera.vertical -
+                    self.camera.origin;
   direction = normalize(direction);
-  if (fabs(direction.x) < 1e-5f) direction.x = 1e-5f;
-  if (fabs(direction.y) < 1e-5f) direction.y = 1e-5f;
-  if (fabs(direction.z) < 1e-5f) direction.z = 1e-5f;
+  if (fabs(direction.x) < 1e-5f)
+    direction.x = 1e-5f;
+  if (fabs(direction.y) < 1e-5f)
+    direction.y = 1e-5f;
+  if (fabs(direction.z) < 1e-5f)
+    direction.z = 1e-5f;
   ray.direction = normalize(direction);
 }
 
@@ -39,18 +56,24 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   prd.missed = true;
   prd.rgba = vec4f(0, 0, 0, 0);
   prd.dataValue = 0;
+  prd.debug = dbg();
   owl::traceRay(/*accel to trace against*/ self.volume.macrocellTLAS,
                 /*the ray to trace*/ ray,
                 /*prd*/ prd);
   if (!prd.missed)
     count += 0.1f;
   // map prd.dataValue to color
-  //vec3f color = prd.missed ? vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z) : vec3f(count, count, count);
+  // vec3f color = prd.missed ? vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z) : vec3f(count, count, count);
   vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
-  // printf("color: %f %f %f count %f\n", color.x, color.y, color.z, count);
 
   const int fbOfs = pixelID.x + self.fbSize.x * pixelID.y;
   self.fbPtr[fbOfs] = owl::make_rgba(color);
+#ifdef ACTIVATE_CROSSHAIRS
+  if (pixelID.x == self.fbSize.x / 2 || pixelID.y == self.fbSize.y / 2 ||
+      pixelID.x == self.fbSize.x / 2 + 1 || pixelID.y == self.fbSize.y / 2 + 1 ||
+      pixelID.x == self.fbSize.x / 2 - 1 || pixelID.y == self.fbSize.y / 2 - 1)
+    self.fbPtr[fbOfs] = owl::make_rgba(color * 0.33f);
+#endif
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(TriangleClosestHit)
@@ -77,7 +100,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
 {
   const MacrocellData &self = owl::getProgramData<MacrocellData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
-  // printf("hit delta cell\n");
+  if(prd.debug)
+    printf("hit delta cell\n");
   prd.missed = false;
   //   auto &lp = optixLaunchParams;
   //   vec3f origin = vec3f(optixGetWorldRayOrigin());
@@ -170,7 +194,6 @@ OPTIX_BOUNDS_PROGRAM(MacrocellBounds)
     primBounds.upper.x = self.bboxes[(primID * 2 + 1)].x;
     primBounds.upper.y = self.bboxes[(primID * 2 + 1)].y;
     primBounds.upper.z = self.bboxes[(primID * 2 + 1)].z;
-    printf("bounds: %f %f %f %f %f %f\n", primBounds.lower.x, primBounds.lower.y, primBounds.lower.z, primBounds.upper.x, primBounds.upper.y, primBounds.upper.z);
   }
 }
 
@@ -393,13 +416,21 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   // if (prd.rgba.w > .99f)
   //   return;
 
-  box4f bbox(self.bboxes[primID], self.bboxes[primID + 1]);
+  box4f bbox;
+  bbox.extend(self.bboxes[primID]).extend(self.bboxes[primID + 1]);
   float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.upper.z);
   float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.lower.z);
   float3 origin = optixGetObjectRayOrigin();
   // note, this is _not_ normalized. Useful for computing world space tmin/mmax
   float3 direction = optixGetObjectRayDirection();
   float3 dirfrac;
+
+  if (prd.debug)
+  {
+    printf("bbox: min %f %f %f\n\t max %f %f %f\n",
+           bbox.lower.x, bbox.lower.y, bbox.upper.z,
+           bbox.upper.x, bbox.upper.y, bbox.lower.z);
+  }
 
   // direction is unit direction vector of ray
   dirfrac.x = 1.0f / direction.x;
@@ -420,23 +451,40 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   float tNear = max(max(tmin.x, tmin.y), tmin.z);
   float tFar = min(min(tmax.x, tmax.y), tmax.z);
 
-  // if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
-  if (tFar < 0) { return; }
+  if (prd.debug)
+  {
+    printf("direction: %f %f %f\n\t tmin %f %f %f\n\t tmax %f %f %f\n\t tNear %f tFar %f\n",
+           direction.x, direction.y, direction.z,
+           tmin.x, tmin.y, tmin.z,
+           tmax.x, tmax.y, tmax.z,
+           tNear, tFar);
+  }
 
+  // if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
+  if (tFar < 0)
+  {
+    //tFar = -tFar;
+    return;
+  }
 
   // if tmin > tmax, ray doesn't intersect AABB
-  if (tNear > tFar) { return; }
+  if (tNear > tFar)
+  {
+    // float tmp = tNear;
+    // tNear = tFar;
+    // tFar = tmp;
+    return;
+  }
 
   // clip hit to near position
   tNear = max(tNear, optixGetRayTmin());
-
 
   if (optixReportIntersection(tNear, /* hit kind */ 0))
   {
     prd.t0 = max(prd.t0, tNear);
     prd.t1 = min(prd.t1, tFar);
     prd.rng.init(bbox.lower.w, bbox.upper.w);
-    prd.rgba = make_float4(prd.rng(),prd.rng(),prd.rng(), 1.f);
+    prd.rgba = make_float4(prd.rng(), prd.rng(), prd.rng(), 1.f);
   }
 }
 

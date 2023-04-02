@@ -100,6 +100,7 @@ struct RayPayload {
     //float maxima[NUM_BINS];
     bool shadowRay;
     bool missed;
+    bool debug;
   };
 
 
