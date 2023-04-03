@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <chrono>
 
-#include "GL/gl.h"
-// our device-side data structures
+// #include "GL/gl.h"
+
+#define TFN_WIDGET_NO_STB_IMAGE_IMPL
+#include "transfer_function_widget.h"
 
 #include "DeviceCode.h"
 #include "Renderer.h"
@@ -60,28 +62,37 @@ int main(int ac, char **av)
   int x, y;
   x = y = 800;
 
+  //----------Create ImGui Context----------------
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   (void)io;
-
+  // init ImGui
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(glfw->getWindow(), true);
   ImGui_ImplOpenGL3_Init("#version 130");
 
+  // init OpenGL for imgui tnf editor
+  if (ogl_LoadFunctions() == ogl_LOAD_FAILED)
+  {
+    std::cerr << "Failed to initialize OpenGL\n";
+    return 1;
+  }
+  // create a transfer function editor
+  tfnw::TransferFunctionWidget tfn_widget;
+
   // ##################################################################
   // now that everything is ready: launch it ....
   // ##################################################################
-
   int fCount = 0;
   while (!glfw->windowShouldClose())
   {
+    //----------------Renderer and Windowing----------------
     // render the frame
     renderer.Render();
     const uint32_t *fb = (const uint32_t *)owlBufferGetPointer(renderer.frameBuffer, 0);
 
     // draw the frame to the window
     glfw->draw((void *)fb);
-
     assert(fb);
 
     // if(glfw->key.isPressed(GLFW_KEY_ESCAPE))
@@ -93,25 +104,27 @@ int main(int ac, char **av)
                      fb, renderer.fbSize.x * sizeof(uint32_t));
     fCount++;
 
-    // glfw->setWindowSize(x, y);
-    // renderer.Resize(owl::vec2i(x, y));
-    // x = y++;
-
-
+    //----------------ImGui----------------
+    //request new frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGui::Begin("Renderer Control Panel");
+    if (ImGui::CollapsingHeader("Transfer Function Editor", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+      tfn_widget.draw_ui();
+    }ImGui::End();
 
-    //ImGui::Begin("fuck", 0, ImGuiWindowFlags_None);
+    ImGui::Render();//render frame
 
-    // Actual GUI code goes here
-    ImGui::ShowDemoWindow();
-
-    //ImGui::End();
-    ImGui::Render();
+    // check if ImGui is capturing the mouse
     ImGuiIO &io = ImGui::GetIO();
-    //glViewport(0, 0, (GLsizei)io.DisplaySize.x, (GLsizei)io.DisplaySize.y);
+    if (io.WantCaptureMouse) // then we don't want to poll the mouse from other apps
+      glfw->mouseState.imGuiPolling = true;
+    else
+      glfw->mouseState.imGuiPolling = false;
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
     glfw->swapBuffers();
     glfw->pollEvents();
     renderer.Update();

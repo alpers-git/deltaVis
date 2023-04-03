@@ -72,6 +72,8 @@ class GLFWHandler
         struct MouseState {
             owl::vec2f position;
             owl::vec2f delta;
+
+            bool imGuiPolling = false;
             bool leftButtonDown = false;
             bool rightButtonDown = false;
             bool middleButtonDown = false;

@@ -63,6 +63,8 @@ void GLFWHandler::SetCallbacks()
 
     glfwSetMouseButtonCallback(window, [](GLFWwindow *window, int button, int action, int mods) {
         auto glfw = GLFWHandler::getInstance();
+        if(glfw->mouseState.imGuiPolling)
+            return;
         if (button == GLFW_MOUSE_BUTTON_LEFT)
         {
             glfw->mouseState.leftButtonDown = action == GLFW_PRESS;

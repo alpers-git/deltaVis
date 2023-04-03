@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
 
 add_subdirectory(submodules/owl EXCLUDE_FROM_ALL)
@@ -35,7 +36,15 @@ add_library("ImGui" STATIC ${IMGUI_SOURCES}
 target_include_directories("ImGui" PUBLIC ${IMGUI_PATH} ${IMGUI_PATH}/backends glfw)
 include_directories(submodules/imgui)
 #---------------------------------------------#
+#-----------------imgui-tfn-------------------#
+set(IMGUI_TFN_PATH  submodules/imgui-transfer-function)
 
+# Compile as static library
+file(GLOB IMGUI_TFN_SOURCES ${IMGUI_TFN_PATH}/*.cpp ${IMGUI_TFN_PATH}/*.c)
+add_library("ImGuiTFN" STATIC ${IMGUI_TFN_SOURCES})
+target_include_directories("ImGuiTFN" PUBLIC ${IMGUI_TFN_PATH})
+include_directories(submodules/imgui-transfer-function)
+#---------------------------------------------#
 #umesh
 add_subdirectory(submodules/umesh EXCLUDE_FROM_ALL)
 add_definitions(${UMESH_DEFINITIONS})
@@ -66,14 +75,18 @@ add_executable(deltaVisViewer
     CameraManipulator.cpp
     UnstructuredElementHelpers.h
     stb_image_write.h
+    # submodules/imgui-transfer-function/transfer_function_widget.cpp
+    # submodules/imgui-transfer-function/gl_core_4_5.c
 )
+target_link_libraries(deltaVisViewer PRIVATE -lGL -lGLX)
 target_link_libraries(deltaVisViewer 
     PRIVATE 
     deviceCode_ptx
-    PRIVATE ${OPENGL_LIBRARIES}
+    PUBLIC ${OPENGL_LIBRARIES}
     owl::owl
     glfw
     ImGui
+    ImGuiTFN
+    # imgui_tfn
     umesh)
-
 
