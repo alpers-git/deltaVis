@@ -27,6 +27,8 @@ public:
     void Render();
     void Update();
     void Resize(const vec2i newSize);
+    void SetOpacityScale(float scale);
+    void SetColorMap(const std::vector<owl::vec4f> &newXF);
 
     void Shutdown();
 
@@ -75,6 +77,15 @@ public:
 
     vec2i fbSize = vec2i(800,600);
     vec3i macrocellDims = {2,2,2};
+
+
+    OWLBuffer colorMapBuffer { 0 };
+    cudaArray_t colorMapArray { 0 };
+    cudaTextureObject_t colorMapTexture { 0 };
+
+    interval<float> volDomain;
+    float opacityScale = 1.f;
+    std::vector<vec4f> colorMap;
 };
 
 }

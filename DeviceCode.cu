@@ -18,6 +18,26 @@ inline __device__ bool dbg()
 #endif
 }
 
+inline __device__
+float4 transferFunction(float f, float2 volumeDomain)
+{
+    const RayGenData &self = owl::getProgramData<RayGenData>();
+    if (f < volumeDomain.x ||
+        f >  volumeDomain.y)
+    {
+        //gradient = 0.f;
+        return make_float4(1.f, 0.f, 1.f, 0.5f);
+    }
+    float remapped
+        = (f - volumeDomain.x) /
+        (volumeDomain.y - volumeDomain.x);
+
+    float4 xf = tex2D<float4>(self.transferFunction.xf, remapped, 0.5f);
+    xf.w *= self.transferFunction.opacityScale;
+    
+    return xf;
+}
+
 inline __device__ void generateRay(const vec2f screen, owl::Ray &ray)
 {
   auto &self = owl::getProgramData<RayGenData>();
@@ -55,7 +75,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   float count = 0;
   prd.missed = true;
   prd.rgba = vec4f(0, 0, 0, 0);
-  prd.dataValue = 0;
+  //prd.dataValue = 0;
   prd.debug = dbg();
   owl::traceRay(/*accel to trace against*/ self.volume.macrocellTLAS,
                 /*the ray to trace*/ ray,
@@ -63,8 +83,9 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   if (!prd.missed)
     count += 0.1f;
   // map prd.dataValue to color
-  // vec3f color = prd.missed ? vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z) : vec3f(count, count, count);
-  vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
+  float4 tfColor = transferFunction(prd.dataValue, self.transferFunction.volumeDomain);
+  vec4f color = prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
+  //vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
 
   const int fbOfs = pixelID.x + self.fbSize.x * pixelID.y;
   self.fbPtr[fbOfs] = owl::make_rgba(color);
@@ -188,12 +209,19 @@ OPTIX_BOUNDS_PROGRAM(MacrocellBounds)
   //  }
   //  else
   {
-    primBounds.lower.x = self.bboxes[(primID * 2 + 0)].x;
-    primBounds.lower.y = self.bboxes[(primID * 2 + 0)].y;
-    primBounds.lower.z = self.bboxes[(primID * 2 + 0)].z;
-    primBounds.upper.x = self.bboxes[(primID * 2 + 1)].x;
-    primBounds.upper.y = self.bboxes[(primID * 2 + 1)].y;
-    primBounds.upper.z = self.bboxes[(primID * 2 + 1)].z;
+    primBounds = box3f();
+    primBounds = primBounds.including(vec3f(self.bboxes[(primID * 2 + 0)].x, 
+        self.bboxes[(primID * 2 + 0)].y, 
+        self.bboxes[(primID * 2 + 0)].z));
+    primBounds = primBounds.including(vec3f(self.bboxes[(primID * 2 + 1)].x,
+        self.bboxes[(primID * 2 + 1)].y,
+        self.bboxes[(primID * 2 + 1)].z));
+    // primBounds.lower.x = self.bboxes[(primID * 2 + 0)].x;
+    // primBounds.lower.y = self.bboxes[(primID * 2 + 0)].y;
+    // primBounds.lower.z = self.bboxes[(primID * 2 + 0)].z;
+    // primBounds.upper.x = self.bboxes[(primID * 2 + 1)].x;
+    // primBounds.upper.y = self.bboxes[(primID * 2 + 1)].y;
+    // primBounds.upper.z = self.bboxes[(primID * 2 + 1)].z;
   }
 }
 
@@ -417,9 +445,9 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   //   return;
 
   box4f bbox;
-  bbox.extend(self.bboxes[primID]).extend(self.bboxes[primID + 1]);
-  float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.upper.z);
-  float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.lower.z);
+  bbox.extend(self.bboxes[primID+1]).extend(self.bboxes[primID]);
+  float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.lower.z);
+  float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.upper.z);
   float3 origin = optixGetObjectRayOrigin();
   // note, this is _not_ normalized. Useful for computing world space tmin/mmax
   float3 direction = optixGetObjectRayDirection();
@@ -470,9 +498,9 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   // if tmin > tmax, ray doesn't intersect AABB
   if (tNear > tFar)
   {
-    // float tmp = tNear;
-    // tNear = tFar;
-    // tFar = tmp;
+    //float tmp = tNear;
+    //tNear = tFar;
+    //tFar = tmp;
     return;
   }
 
@@ -483,8 +511,9 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   {
     prd.t0 = max(prd.t0, tNear);
     prd.t1 = min(prd.t1, tFar);
-    prd.rng.init(bbox.lower.w, bbox.upper.w);
-    prd.rgba = make_float4(prd.rng(), prd.rng(), prd.rng(), 1.f);
+    // prd.rng.init(bbox.lower.w, bbox.upper.w);
+    // prd.rgba = make_float4(prd.rng(), prd.rng(), prd.rng(), 1.f);
+    prd.dataValue = (bbox.lower.w + bbox.upper.w) * 0.5;
   }
 }
 

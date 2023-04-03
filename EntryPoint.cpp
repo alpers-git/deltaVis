@@ -105,17 +105,25 @@ int main(int ac, char **av)
     fCount++;
 
     //----------------ImGui----------------
-    //request new frame
+    // request new frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::Begin("Renderer Control Panel");
     if (ImGui::CollapsingHeader("Transfer Function Editor", ImGuiTreeNodeFlags_DefaultOpen))
     {
+      static float opacity = 1.0f;
+      ImGui::Text("Opacity scale");
+      ImGui::SameLine();
+      if (ImGui::SliderFloat("##5", &opacity, 0.0f, 1.0f))
+        ;
+      // setOpacityScale(opacity);
+      auto canvasSize = ImGui::GetContentRegionAvail();
       tfn_widget.draw_ui();
-    }ImGui::End();
+    }
+    ImGui::End();
 
-    ImGui::Render();//render frame
+    ImGui::Render(); // render frame
 
     // check if ImGui is capturing the mouse
     ImGuiIO &io = ImGui::GetIO();
@@ -124,6 +132,17 @@ int main(int ac, char **av)
     else
       glfw->mouseState.imGuiPolling = false;
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    // poll tfn changes
+    if (tfn_widget.changed())
+    {
+      auto cm = tfn_widget.get_colormapf();
+      std::vector<owl::vec4f> colorMapVec;
+      for (int i = 0; i < cm.size(); i += 4)
+        colorMapVec.push_back(owl::vec4f(cm[i],
+                                        cm[i + 1], cm[i + 2], cm[i + 3]));
+      renderer.SetColorMap(colorMapVec);
+    }
 
     glfw->swapBuffers();
     glfw->pollEvents();

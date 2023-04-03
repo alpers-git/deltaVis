@@ -43,6 +43,10 @@ OWLVarDecl rayGenVars[] = {
     {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.elementTLAS)},
     {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.macrocellTLAS)},
     {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(RayGenData, volume.macrocellDims)},
+    //transfer function
+    {"transferFunction.xf", OWL_USER_TYPE(cudaTextureObject_t), OWL_OFFSETOF(RayGenData, transferFunction.xf)},
+    {"transferFunction.volumeDomain", OWL_FLOAT2, OWL_OFFSETOF(RayGenData, transferFunction.volumeDomain)},
+    {"transferFunction.opacityScale", OWL_FLOAT, OWL_OFFSETOF(RayGenData, transferFunction.opacityScale)},
     //{"volume.mecrocells"}
     {/* sentinel to mark end of list */}};
 namespace deltaVis
@@ -310,7 +314,6 @@ namespace deltaVis
     owlGroupBuildAccel(trianglesGroup);
     triangleTLAS = owlInstanceGroupCreate(context, 1, &trianglesGroup);
     owlGroupBuildAccel(triangleTLAS);
-    // owlParamsSetGroup(lp, "trianglesTLAS", trianglesTLAS);
 
     // go over the vertices of the scene calculate the bounding box and find the center
     auto center = umeshPtr->getBounds().center();
@@ -321,6 +324,12 @@ namespace deltaVis
     // set up camera controller
     controller = new CameraManipulator(&camera);
     OnCameraChange();
+
+    //transfer function
+    SetOpacityScale(1.0f);
+    volDomain = interval<float>({umeshPtr->getBounds4f().lower.w, umeshPtr->getBounds4f().upper.w});
+    printf("volDomain: %f %f\n", volDomain.lower, volDomain.upper);
+    owlRayGenSet2f(rayGen, "transferFunction.volumeDomain", owl2f{volDomain.lower, volDomain.upper});
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -360,6 +369,76 @@ namespace deltaVis
     owlBufferResize(frameBuffer, fbSize.x * fbSize.y);
     owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
     OnCameraChange();
+  }
+
+  void Renderer::SetOpacityScale(float scale)
+  {
+    owlRayGenSet1f(rayGen, "transferFunction.opacityScale", scale);
+  }
+
+  void Renderer::SetColorMap(const std::vector<vec4f> &newCM)
+  {
+     std::vector<vec4f> CM = newCM;
+    for (uint32_t i = 0; i < CM.size(); ++i) {
+      CM[i].w = powf(CM[i].w, 3.f);
+    }
+      
+    this->colorMap = CM;
+    if (!colorMapBuffer)
+      colorMapBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,
+                                             CM.size(),nullptr);
+    owlBufferUpload(colorMapBuffer,CM.data());
+    
+    if (colorMapTexture != 0) {
+      (cudaDestroyTextureObject(colorMapTexture));
+      colorMapTexture = 0;
+    }
+
+    cudaResourceDesc res_desc = {};
+    cudaChannelFormatDesc channel_desc
+      = cudaCreateChannelDesc<float4>();
+    
+    // cudaArray_t   voxelArray;
+    if (colorMapArray == 0) {
+      (cudaMallocArray(&colorMapArray,
+                            &channel_desc,
+                            CM.size(),1));
+    }
+    
+    int pitch = CM.size()*sizeof(CM[0]);
+    (cudaMemcpy2DToArray(colorMapArray,
+                              /* offset */0,0,
+                              CM.data(),
+                              pitch,pitch,1,
+                              cudaMemcpyHostToDevice));
+    
+    res_desc.resType          = cudaResourceTypeArray;
+    res_desc.res.array.array  = colorMapArray;
+    
+    cudaTextureDesc tex_desc     = {};
+    tex_desc.addressMode[0]      = cudaAddressModeClamp;
+    tex_desc.addressMode[1]      = cudaAddressModeClamp;
+    tex_desc.filterMode          = cudaFilterModeLinear;
+    tex_desc.normalizedCoords    = 1;
+    tex_desc.maxAnisotropy       = 1;
+    tex_desc.maxMipmapLevelClamp = 99;
+    tex_desc.minMipmapLevelClamp = 0;
+    tex_desc.mipmapFilterMode    = cudaFilterModePoint;
+    tex_desc.borderColor[0]      = 0.0f;
+    tex_desc.borderColor[1]      = 0.0f;
+    tex_desc.borderColor[2]      = 0.0f;
+    tex_desc.borderColor[3]      = 0.0f;
+    tex_desc.sRGB                = 0;
+    (cudaCreateTextureObject(&colorMapTexture, &res_desc, &tex_desc,
+                                  nullptr));
+
+
+    // OWLTexture xfTexture
+    //   = owlTexture2DCreate(owl,OWL_TEXEL_FORMAT_RGBA32F,
+    //                        colorMap.size(),1,
+    //                        colorMap.data());
+    owlRayGenSetRaw(rayGen,"transferFunction.xf", &colorMapTexture);
+
   }
 
   void Renderer::OnCameraChange()
