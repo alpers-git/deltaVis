@@ -38,49 +38,35 @@ namespace deltaVis
             globalBounds.extend(vec4f(vertices[i].x, vertices[i].y, vertices[i].z, scalars[i]));
         }
         vec4f cellSize = (globalBounds.upper - globalBounds.lower) / vec4f(dims.x, dims.y, dims.z, 1);
-
-        // set the bounds for each macrocell
-        int i, j, k;
-        i = j = k = 0;
-        for (float x = globalBounds.lower.x; x < globalBounds.upper.x; x += cellSize.x)
+        for (size_t i = 0; i < dims.x; i++)
         {
-            j = 0;
-            for (float y = globalBounds.lower.y; y < globalBounds.upper.y; y += cellSize.y)
+            for (size_t j = 0; j < dims.y; j++)
             {
-                k = 0;
-                for (float z = globalBounds.lower.z; z < globalBounds.upper.z; z += cellSize.z)
+                for (size_t k = 0; k < dims.z; k++)
                 {
-                    float scalarMin = FLT_MAX;
-                    float scalarMax = -FLT_MAX;
-                    // find the min and max of the scalar values in the macrocell using the vertices
-                    for (int l = 0; l < numVertices; l++)
+                    // find the bounds of the current cell
+                    vec4f lower = globalBounds.lower + vec4f(i, j, k, INFINITY) * cellSize* 0.888f;
+                    vec4f upper = lower + cellSize * 0.888f;
+                    upper.w = -INFINITY;
+                    box4f cellBounds(lower, upper);
+                    // find the vertices that are in the current cell
+                    for (int v = 0; v < numVertices; v++)
                     {
-                        if (vertices[l].x >= x && vertices[l].x < x + cellSize.x &&
-                            vertices[l].y >= y && vertices[l].y < y + cellSize.y &&
-                            vertices[l].z >= z && vertices[l].z < z + cellSize.z)
+                        box3f tempBox(vec3f(lower.x, lower.y, lower.z), vec3f(upper.x, upper.y, upper.z));
+                        if (tempBox.contains(vec3f(vertices[v].x, vertices[v].y, vertices[v].z)))
                         {
-                            if (scalars[l] < scalarMin)
-                                scalarMin = scalars[l];
-                            if (scalars[l] > scalarMax)
-                                scalarMax = scalars[l];
+                            // extend the cell bounds to include the current vertex
+                            cellBounds.extend(vec4f(vertices[v].x, vertices[v].y, vertices[v].z, scalars[v]));
                         }
                     }
-                    int idx = (j + k * dims.x) * dims.y + i;
-                    if (idx >= dims.x * dims.y * dims.z)
-                    {
-                        printf("idx out of bounds: %d\n", idx);
-                        continue;
-                    }
-                    // set the bounds for the macrocell
-                    grid[idx] = box4f(
-                        vec4f(x, y, z, scalarMin),
-                        vec4f(x + cellSize.x, y + cellSize.y, z + cellSize.z, scalarMax));
-                    k++;
+                    // insert the cell bounds into the grid
+                    grid[i + j * dims.x + k * dims.x * dims.y] = cellBounds;
                 }
-                j++;
+                
             }
-            i++;
+            
         }
+        
         return grid;
     }
 }
