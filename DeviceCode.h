@@ -55,6 +55,10 @@ struct RayGenData
 {
   uint32_t *fbPtr;
   vec2i fbSize;
+  vec4f *accumBuffer;
+  uint32_t frameID;
+  uint32_t accumID;
+
   OptixTraversableHandle triangleTLAS;
 
   struct

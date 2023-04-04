@@ -52,15 +52,15 @@ int main(int ac, char **av)
 
   // create a window and a GL context
   auto glfw = GLFWHandler::getInstance();
-  glfw->initWindow(800, 800, "DeltaVisViewer");
+  glfw->initWindow(1000, 1000, "DeltaVisViewer");
 
   // create a context on the first device:
   Renderer renderer(umeshHdlPtr);
   renderer.Init();
 
-  renderer.Resize(vec2i(800, 800));
+  renderer.Resize(vec2i(1000, 1000));
   int x, y;
-  x = y = 800;
+  x = y = 1000;
 
   //----------Create ImGui Context----------------
   ImGui::CreateContext();

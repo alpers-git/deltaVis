@@ -44,6 +44,7 @@ public:
     OWLGroup   triangleTLAS   { 0 };
     OWLBuffer  accumBuffer { 0 };
     int        accumID     { 0 };
+    int        frameID     { 0 };
     OWLModule module;
 
     std::vector<OWLGeom> elementGeom;
@@ -76,7 +77,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {2,2,2};
+    vec3i macrocellDims = {1,1,1};
 
 
     OWLBuffer colorMapBuffer { 0 };

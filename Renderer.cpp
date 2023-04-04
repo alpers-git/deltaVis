@@ -33,6 +33,10 @@ OWLVarDecl rayGenVars[] = {
     // framebuffer
     {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(RayGenData, fbPtr)},
     {"fbSize", OWL_INT2, OWL_OFFSETOF(RayGenData, fbSize)},
+    // accum buffer
+    {"accumID", OWL_INT, OWL_OFFSETOF(RayGenData, accumID)},
+    {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(RayGenData, accumBuffer)},
+    {"frameID", OWL_INT, OWL_OFFSETOF(RayGenData, frameID)},
     {"triangleTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, triangleTLAS)},
     // camera
     {"camera.org", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.origin)},
@@ -152,12 +156,21 @@ namespace deltaVis
     owlBuildPrograms(context);
     // owlBuildPipeline(context);
 
+    frameBuffer = owlHostPinnedBufferCreate(context, OWL_INT, fbSize.x * fbSize.y);
+    if (!accumBuffer)
+        accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
+    owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
+    owlRayGenSetBuffer(rayGen,"accumBuffer",accumBuffer);
+    accumID = 0;
+    frameID = 0;
+    owlRayGenSet1i(rayGen,"accumID",accumID);
+    owlRayGenSet1i(rayGen,"frameID",frameID);
     // ##################################################################
     // set up all the *GEOMS* we want to run that code on
     // ##################################################################
 
     LOG("building geometries ...");
-    frameBuffer = owlHostPinnedBufferCreate(context, OWL_INT, fbSize.x * fbSize.y);
+
     // ----------- set variables  ----------------------------
     owlMissProgSet3f(missProg, "color0", owl3f{.2f, .2f, .26f});
     owlMissProgSet3f(missProg, "color1", owl3f{.1f, .1f, .16f});
@@ -173,6 +186,7 @@ namespace deltaVis
     hexahedraData = owlDeviceBufferCreate(context, OWL_INT, umeshPtr->hexes.size() * 8, nullptr);
     verticesData = owlDeviceBufferCreate(context, OWL_FLOAT3, umeshPtr->vertices.size(), nullptr);
     scalarData = owlDeviceBufferCreate(context, OWL_FLOAT, umeshPtr->perVertex->values.size(), nullptr);
+    
     // Upload data
     owlBufferUpload(tetrahedraData, umeshPtr->tets.data());
     owlBufferUpload(pyramidsData, umeshPtr->pyrs.data());
@@ -196,7 +210,8 @@ namespace deltaVis
 
     auto macrocellBLAS = owlUserGeomGroupCreate(context, 1, &userGeom, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellBLAS);
-    macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS);
+    macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS, 
+      nullptr, nullptr, OWL_MATRIX_FORMAT_OWL, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellTLAS);
     owlRayGenSetGroup(rayGen, "volume.macrocellTLAS", macrocellTLAS);
 
@@ -208,7 +223,7 @@ namespace deltaVis
     if (umeshPtr->tets.size() > 0)
     {
       OWLGeom tetrahedraGeom = owlGeomCreate(context, tetrahedraType);
-      owlGeomSetPrimCount(tetrahedraGeom, umeshPtr->tets.size());
+      owlGeomSetPrimCount(tetrahedraGeom, umeshPtr->tets.size() *4);
       owlGeomSetBuffer(tetrahedraGeom, "tetrahedra", tetrahedraData);
       owlGeomSetBuffer(tetrahedraGeom, "vertices", verticesData);
       owlGeomSetBuffer(tetrahedraGeom, "scalars", scalarData);
@@ -343,6 +358,10 @@ namespace deltaVis
   {
     owlBuildSBT(context);
     owlRayGenLaunch2D(rayGen, fbSize.x, fbSize.y);
+    accumID++;
+    frameID++;
+    owlRayGenSet1i(rayGen, "accumID", accumID);
+    owlRayGenSet1i(rayGen, "frameID", frameID);
     // for host pinned mem it doesn't matter which device we query...
     // const uint32_t *fb = (const uint32_t*)owlBufferGetPointer(frameBuffer,0);
   }
@@ -368,12 +387,17 @@ namespace deltaVis
     fbSize = newSize;
     owlBufferResize(frameBuffer, fbSize.x * fbSize.y);
     owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
+    if (!accumBuffer)
+        accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
+    owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
+    owlRayGenSetBuffer(rayGen,"accumBuffer",accumBuffer);
     OnCameraChange();
   }
 
   void Renderer::SetOpacityScale(float scale)
   {
     owlRayGenSet1f(rayGen, "transferFunction.opacityScale", scale);
+    accumID = 0;
   }
 
   void Renderer::SetColorMap(const std::vector<vec4f> &newCM)
@@ -438,6 +462,7 @@ namespace deltaVis
     //                        colorMap.size(),1,
     //                        colorMap.data());
     owlRayGenSetRaw(rayGen,"transferFunction.xf", &colorMapTexture);
+    accumID = 0;
 
   }
 
@@ -463,7 +488,7 @@ namespace deltaVis
     const vec3f horizontal = 2.0f * half_width * focusDist * u;
     const vec3f vertical = 2.0f * half_height * focusDist * v;
 
-    // accumID = 0;
+    accumID = 0;
 
     // ----------- set variables  ----------------------------
     owlRayGenSetGroup(rayGen, "triangleTLAS", triangleTLAS);
@@ -471,5 +496,6 @@ namespace deltaVis
     owlRayGenSet3f(rayGen, "camera.llc", (const owl3f &)lower_left_corner);
     owlRayGenSet3f(rayGen, "camera.horiz", (const owl3f &)horizontal);
     owlRayGenSet3f(rayGen, "camera.vert", (const owl3f &)vertical);
+    owlRayGenSet1i(rayGen, "accumID", accumID);
   }
 }

@@ -45,8 +45,8 @@ namespace deltaVis
                 for (size_t k = 0; k < dims.z; k++)
                 {
                     // find the bounds of the current cell
-                    vec4f lower = globalBounds.lower + vec4f(i, j, k, INFINITY) * cellSize* 0.888f;
-                    vec4f upper = lower + cellSize * 0.888f;
+                    vec4f lower = globalBounds.lower + vec4f(i, j, k, INFINITY) * cellSize;
+                    vec4f upper = lower + cellSize * 0.999f;
                     upper.w = -INFINITY;
                     box4f cellBounds(lower, upper);
                     // find the vertices that are in the current cell
@@ -62,9 +62,7 @@ namespace deltaVis
                     // insert the cell bounds into the grid
                     grid[i + j * dims.x + k * dims.x * dims.y] = cellBounds;
                 }
-                
-            }
-            
+            }  
         }
         
         return grid;
