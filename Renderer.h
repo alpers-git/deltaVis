@@ -78,7 +78,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {1,1,1};
+    vec3i macrocellDims = {4,4,4};
 
 
     OWLBuffer colorMapBuffer { 0 };

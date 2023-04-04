@@ -27,10 +27,10 @@ struct TriangleData
 
 struct UnstructuredElementData
 {
-  void *tetrahedra;
-  void *pyramids;
-  void *hexahedra;
-  void *wedges;
+  unsigned int *tetrahedra;
+  unsigned int *pyramids;
+  unsigned int *hexahedra;
+  unsigned int *wedges;
   uint32_t bytesPerIndex;
   vec3f *vertices;
   float *scalars;

@@ -226,7 +226,7 @@ namespace deltaVis
     owlParamsSet3i(lp, "volume.macrocellDims", (const owl3i &)macrocellDims);
     
     delete[] grid;
-    //cudaDeviceSynchronize();
+    cudaDeviceSynchronize();
 
     if (umeshPtr->tets.size() > 0)
     {

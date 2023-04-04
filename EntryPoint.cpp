@@ -139,8 +139,10 @@ int main(int ac, char **av)
       auto cm = tfn_widget.get_colormapf();
       std::vector<owl::vec4f> colorMapVec;
       for (int i = 0; i < cm.size(); i += 4)
+      {
         colorMapVec.push_back(owl::vec4f(cm[i],
                                         cm[i + 1], cm[i + 2], cm[i + 3]));
+      }
       renderer.SetColorMap(colorMapVec);
     }
 
