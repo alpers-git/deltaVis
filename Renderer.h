@@ -40,6 +40,7 @@ public:
     CameraManipulator* controller;
 
     OWLRayGen  rayGen  { 0 };
+    OWLParams lp       { 0 };
     OWLContext context { 0 };
     OWLGroup   triangleTLAS   { 0 };
     OWLBuffer  accumBuffer { 0 };

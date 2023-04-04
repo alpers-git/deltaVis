@@ -51,7 +51,7 @@ struct MacrocellData
 };
 
 /* variables for the ray generation program */
-struct RayGenData
+struct LaunchParams
 {
   uint32_t *fbPtr;
   vec2i fbSize;
@@ -93,6 +93,9 @@ struct RayGenData
     vec3f vertical;
   } camera;
 };
+
+struct RayGenData
+{};
 
 struct RayPayload
 {

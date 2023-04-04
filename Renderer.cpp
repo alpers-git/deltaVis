@@ -29,28 +29,34 @@ vec3i indices[NUM_INDICES] =
     {
         {0, 1, 3}, {2, 3, 0}, {5, 7, 6}, {5, 6, 4}, {0, 4, 5}, {0, 5, 1}, {2, 3, 7}, {2, 7, 6}, {1, 5, 7}, {1, 7, 3}, {4, 0, 2}, {4, 2, 6}};
 
-OWLVarDecl rayGenVars[] = {
+OWLVarDecl rayGenVars[]
+  = {
+     { nullptr /* sentinel to mark end of list */ }
+  };
+
+
+OWLVarDecl launchParamVars[] = {
     // framebuffer
-    {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(RayGenData, fbPtr)},
-    {"fbSize", OWL_INT2, OWL_OFFSETOF(RayGenData, fbSize)},
+    {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, fbPtr)},
+    {"fbSize", OWL_INT2, OWL_OFFSETOF(LaunchParams, fbSize)},
     // accum buffer
-    {"accumID", OWL_INT, OWL_OFFSETOF(RayGenData, accumID)},
-    {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(RayGenData, accumBuffer)},
-    {"frameID", OWL_INT, OWL_OFFSETOF(RayGenData, frameID)},
-    {"triangleTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, triangleTLAS)},
+    {"accumID", OWL_INT, OWL_OFFSETOF(LaunchParams, accumID)},
+    {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
+    {"frameID", OWL_INT, OWL_OFFSETOF(LaunchParams, frameID)},
+    {"triangleTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, triangleTLAS)},
     // camera
-    {"camera.org", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.origin)},
-    {"camera.llc", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.lower_left_corner)},
-    {"camera.horiz", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.horizontal)},
-    {"camera.vert", OWL_FLOAT3, OWL_OFFSETOF(RayGenData, camera.vertical)},
+    {"camera.org", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.origin)},
+    {"camera.llc", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.lower_left_corner)},
+    {"camera.horiz", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.horizontal)},
+    {"camera.vert", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, camera.vertical)},
     // Volume data
-    {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.elementTLAS)},
-    {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(RayGenData, volume.macrocellTLAS)},
-    {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(RayGenData, volume.macrocellDims)},
+    {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.elementTLAS)},
+    {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.macrocellTLAS)},
+    {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(LaunchParams, volume.macrocellDims)},
     //transfer function
-    {"transferFunction.xf", OWL_USER_TYPE(cudaTextureObject_t), OWL_OFFSETOF(RayGenData, transferFunction.xf)},
-    {"transferFunction.volumeDomain", OWL_FLOAT2, OWL_OFFSETOF(RayGenData, transferFunction.volumeDomain)},
-    {"transferFunction.opacityScale", OWL_FLOAT, OWL_OFFSETOF(RayGenData, transferFunction.opacityScale)},
+    {"transferFunction.xf", OWL_USER_TYPE(cudaTextureObject_t), OWL_OFFSETOF(LaunchParams, transferFunction.xf)},
+    {"transferFunction.volumeDomain", OWL_FLOAT2, OWL_OFFSETOF(LaunchParams, transferFunction.volumeDomain)},
+    {"transferFunction.opacityScale", OWL_FLOAT, OWL_OFFSETOF(LaunchParams, transferFunction.opacityScale)},
     //{"volume.mecrocells"}
     {/* sentinel to mark end of list */}};
 namespace deltaVis
@@ -74,11 +80,16 @@ namespace deltaVis
     // create a context on the first device:
     context = owlContextCreate(nullptr, 1);
     module = owlModuleCreate(context, deviceCode_ptx);
-
     // ##################################################################
     // set miss and raygen program required for SBT
     // ##################################################################
 
+    // -------------------------------------------------------
+    // set up ray gen program
+    // -------------------------------------------------------
+    rayGen = owlRayGenCreate(context, module, "simpleRayGen",
+                             sizeof(RayGenData),
+                             rayGenVars, -1);
     // -------------------------------------------------------
     // set up miss prog
     // -------------------------------------------------------
@@ -90,12 +101,9 @@ namespace deltaVis
     OWLMissProg missProg = owlMissProgCreate(context, module, "miss", sizeof(MissProgData),
                                              missProgVars, -1);
 
-    // -------------------------------------------------------
-    // set up ray gen program
-    // -------------------------------------------------------
-    rayGen = owlRayGenCreate(context, module, "simpleRayGen",
-                             sizeof(RayGenData),
-                             rayGenVars, -1);
+
+
+    lp = owlParamsCreate(context, sizeof(LaunchParams), launchParamVars,-1);
     // -------------------------------------------------------
     // declare geometry type
     // -------------------------------------------------------
@@ -160,11 +168,11 @@ namespace deltaVis
     if (!accumBuffer)
         accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
     owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
-    owlRayGenSetBuffer(rayGen,"accumBuffer",accumBuffer);
+    owlParamsSetBuffer(lp, "accumBuffer",accumBuffer);
     accumID = 0;
     frameID = 0;
-    owlRayGenSet1i(rayGen,"accumID",accumID);
-    owlRayGenSet1i(rayGen,"frameID",frameID);
+    owlParamsSet1i(lp, "accumID",accumID);
+    owlParamsSet1i(lp, "frameID",frameID);
     // ##################################################################
     // set up all the *GEOMS* we want to run that code on
     // ##################################################################
@@ -175,9 +183,9 @@ namespace deltaVis
     owlMissProgSet3f(missProg, "color0", owl3f{.2f, .2f, .26f});
     owlMissProgSet3f(missProg, "color1", owl3f{.1f, .1f, .16f});
     // ----------- set variables  ----------------------------
-    owlRayGenSetBuffer(rayGen, "fbPtr", frameBuffer);
-    owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
-    owlRayGenSetGroup(rayGen, "triangleTLAS", triangleTLAS);
+    owlParamsSetBuffer(lp, "fbPtr", frameBuffer);
+    owlParamsSet2i(lp, "fbSize", (const owl2i &)fbSize);
+    owlParamsSetGroup(lp, "triangleTLAS", triangleTLAS);
 
     // Allocate buffers
     tetrahedraData = owlDeviceBufferCreate(context, OWL_INT, umeshPtr->tets.size() * 4, nullptr);
@@ -213,9 +221,9 @@ namespace deltaVis
     macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS, 
       nullptr, nullptr, OWL_MATRIX_FORMAT_OWL, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellTLAS);
-    owlRayGenSetGroup(rayGen, "volume.macrocellTLAS", macrocellTLAS);
+    owlParamsSetGroup(lp, "volume.macrocellTLAS", macrocellTLAS);
 
-    owlRayGenSet3i(rayGen, "volume.macrocellDims", (const owl3i &)macrocellDims);
+    owlParamsSet3i(lp, "volume.macrocellDims", (const owl3i &)macrocellDims);
     
     delete[] grid;
     //cudaDeviceSynchronize();
@@ -305,8 +313,8 @@ namespace deltaVis
       owlGroupGetAccelSize(elementBLAS[i], &final, &peak);
     }
     owlGroupBuildAccel(elementTLAS);
-    // owlParamsSetGroup(rayGenVars, "volume.elementTLAS", elementTLAS);
-    owlRayGenSetGroup(rayGen, "volume.elementTLAS", elementTLAS);
+    // owlParamsSetGroup(lp, "volume.elementTLAS", elementTLAS);
+    owlParamsSetGroup(lp, "volume.elementTLAS", elementTLAS);
 
     size_t peak = 0;
     size_t final = 0;
@@ -344,7 +352,7 @@ namespace deltaVis
     SetOpacityScale(1.0f);
     volDomain = interval<float>({umeshPtr->getBounds4f().lower.w, umeshPtr->getBounds4f().upper.w});
     printf("volDomain: %f %f\n", volDomain.lower, volDomain.upper);
-    owlRayGenSet2f(rayGen, "transferFunction.volumeDomain", owl2f{volDomain.lower, volDomain.upper});
+    owlParamsSet2f(lp, "transferFunction.volumeDomain", owl2f{volDomain.lower, volDomain.upper});
 
     // ##################################################################
     // build *SBT* required to trace the groups
@@ -357,11 +365,11 @@ namespace deltaVis
   void Renderer::Render()
   {
     owlBuildSBT(context);
-    owlRayGenLaunch2D(rayGen, fbSize.x, fbSize.y);
+    owlLaunch2D(rayGen, fbSize.x, fbSize.y, lp);
     accumID++;
     frameID++;
-    owlRayGenSet1i(rayGen, "accumID", accumID);
-    owlRayGenSet1i(rayGen, "frameID", frameID);
+    owlParamsSet1i(lp, "accumID", accumID);
+    owlParamsSet1i(lp, "frameID", frameID);
     // for host pinned mem it doesn't matter which device we query...
     // const uint32_t *fb = (const uint32_t*)owlBufferGetPointer(frameBuffer,0);
   }
@@ -386,17 +394,17 @@ namespace deltaVis
   {
     fbSize = newSize;
     owlBufferResize(frameBuffer, fbSize.x * fbSize.y);
-    owlRayGenSet2i(rayGen, "fbSize", (const owl2i &)fbSize);
+    owlParamsSet2i(lp, "fbSize", (const owl2i &)fbSize);
     if (!accumBuffer)
         accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
     owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
-    owlRayGenSetBuffer(rayGen,"accumBuffer",accumBuffer);
+    owlParamsSetBuffer(lp, "accumBuffer",accumBuffer);
     OnCameraChange();
   }
 
   void Renderer::SetOpacityScale(float scale)
   {
-    owlRayGenSet1f(rayGen, "transferFunction.opacityScale", scale);
+    owlParamsSet1f(lp, "transferFunction.opacityScale", scale);
     accumID = 0;
   }
 
@@ -461,7 +469,7 @@ namespace deltaVis
     //   = owlTexture2DCreate(owl,OWL_TEXEL_FORMAT_RGBA32F,
     //                        colorMap.size(),1,
     //                        colorMap.data());
-    owlRayGenSetRaw(rayGen,"transferFunction.xf", &colorMapTexture);
+    owlParamsSetRaw(lp, "transferFunction.xf", &colorMapTexture);
     accumID = 0;
 
   }
@@ -491,11 +499,11 @@ namespace deltaVis
     accumID = 0;
 
     // ----------- set variables  ----------------------------
-    owlRayGenSetGroup(rayGen, "triangleTLAS", triangleTLAS);
-    owlRayGenSet3f(rayGen, "camera.org", (const owl3f &)origin);
-    owlRayGenSet3f(rayGen, "camera.llc", (const owl3f &)lower_left_corner);
-    owlRayGenSet3f(rayGen, "camera.horiz", (const owl3f &)horizontal);
-    owlRayGenSet3f(rayGen, "camera.vert", (const owl3f &)vertical);
-    owlRayGenSet1i(rayGen, "accumID", accumID);
+    owlParamsSetGroup(lp, "triangleTLAS", triangleTLAS);
+    owlParamsSet3f(lp, "camera.org", (const owl3f &)origin);
+    owlParamsSet3f(lp, "camera.llc", (const owl3f &)lower_left_corner);
+    owlParamsSet3f(lp, "camera.horiz", (const owl3f &)horizontal);
+    owlParamsSet3f(lp, "camera.vert", (const owl3f &)vertical);
+    owlParamsSet1i(lp, "accumID", accumID);
   }
 }

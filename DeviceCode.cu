@@ -4,47 +4,49 @@
 using namespace deltaVis;
 using namespace owl;
 
+extern "C" __constant__ LaunchParams optixLaunchParams;
+
 #define DEBUG 0
 // create a debug function macro that gets called only for center pixel
 inline __device__ bool dbg()
 {
+  auto &lp = optixLaunchParams;
 #if DEBUG
   return false;
 #else
   auto pixelID = vec2i(owl::getLaunchIndex()[0], owl::getLaunchIndex()[1]);
-  return (owl::getProgramData<RayGenData>().fbSize.x / 2 == pixelID.x) &&
-         (owl::getProgramData<RayGenData>().fbSize.y / 2 == pixelID.y);
+  return (lp.fbSize.x / 2 == pixelID.x) &&
+         (lp.fbSize.y / 2 == pixelID.y);
 #define ACTIVATE_CROSSHAIRS
 #endif
 }
 
 inline __device__
-    float4
-    transferFunction(float f, float2 volumeDomain)
+    float4 transferFunction(float f)
 {
-  const RayGenData &self = owl::getProgramData<RayGenData>();
-  if (f < volumeDomain.x ||
-      f > volumeDomain.y)
+  auto &lp = optixLaunchParams;
+  if (f < lp.transferFunction.volumeDomain.x ||
+      f > lp.transferFunction.volumeDomain.y)
   {
     // gradient = 0.f;
     return make_float4(1.f, 0.f, 1.f, 0.5f);
   }
-  float remapped = (f - volumeDomain.x) /
-                   (volumeDomain.y - volumeDomain.x);
+  float remapped = (f - lp.transferFunction.volumeDomain.x) /
+        (lp.transferFunction.volumeDomain.y - lp.transferFunction.volumeDomain.x);
 
-  float4 xf = tex2D<float4>(self.transferFunction.xf, remapped, 0.5f);
-  xf.w *= self.transferFunction.opacityScale;
+  float4 xf = tex2D<float4>(lp.transferFunction.xf, remapped, 0.5f);
+  xf.w *= lp.transferFunction.opacityScale;
 
   return xf;
 }
 
 inline __device__ void generateRay(const vec2f screen, owl::Ray &ray)
 {
-  auto &self = owl::getProgramData<RayGenData>();
-  ray.origin = self.camera.origin;
-  vec3f direction = self.camera.lower_left_corner +
-                    screen.u * self.camera.horizontal +
-                    screen.v * self.camera.vertical - ray.origin;
+  auto &lp = optixLaunchParams;
+  ray.origin = lp.camera.origin;
+  vec3f direction = lp.camera.lower_left_corner +
+                    screen.u * lp.camera.horizontal +
+                    screen.v * lp.camera.vertical - ray.origin;
   direction = normalize(direction);
   if (fabs(direction.x) < 1e-5f)
     direction.x = 1e-5f;
@@ -58,20 +60,20 @@ inline __device__ void generateRay(const vec2f screen, owl::Ray &ray)
 OPTIX_RAYGEN_PROGRAM(simpleRayGen)
 ()
 {
-  const RayGenData &self = owl::getProgramData<RayGenData>();
+  auto& lp = optixLaunchParams;
   const vec2i pixelID = owl::getLaunchIndex();
   // if (pixelID == owl::vec2i(0)) {
   //   printf("%sHello OptiX From your First RayGen Program%s\n",
   //          OWL_TERMINAL_CYAN,
   //          OWL_TERMINAL_DEFAULT);
   // }
-  int seed = owl::getLaunchDims().x * owl::getLaunchDims().y * self.frameID;
+  int seed = owl::getLaunchDims().x * owl::getLaunchDims().y * lp.frameID;
   owl::common::LCG<4> random(threadIdx.x + seed, threadIdx.y + seed);
-  const vec2f screen = (vec2f(pixelID) + vec2f(.5f)) / vec2f(self.fbSize);
+  const vec2f screen = (vec2f(pixelID) + vec2f(.5f)) / vec2f(lp.fbSize);
   owl::Ray ray;
   generateRay(screen, ray);
-  // ray.origin = ray.origin + random() * self.camera.horizontal +
-  //              random() * self.camera.vertical;
+  // ray.origin = ray.origin + random() * lp.camera.horizontal +
+  //              random() * lp.camera.vertical;
 
   RayPayload prd;
   float count = 0;
@@ -79,28 +81,28 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   prd.rgba = vec4f(0, 0, 0, 0);
   // prd.dataValue = 0;
   prd.debug = dbg();
-  owl::traceRay(/*accel to trace against*/ self.volume.macrocellTLAS,
+  owl::traceRay(/*accel to trace against*/ lp.volume.macrocellTLAS,
                 /*the ray to trace*/ ray,
                 /*prd*/ prd);
   if (!prd.missed)
     count += 0.1f;
   // map prd.dataValue to color
-  float4 tfColor = transferFunction(prd.dataValue, self.transferFunction.volumeDomain);
+  float4 tfColor = transferFunction(prd.dataValue);
   vec4f color = prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
   // vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
 
-  const int fbOfs = pixelID.x + self.fbSize.x * pixelID.y;
-  // self.fbPtr[fbOfs] = owl::make_rgba(color);
-  vec4f oldColor = self.accumBuffer[fbOfs];
-  vec4f newColor = (vec4f(color) + float(self.accumID) * oldColor) / float(self.accumID + 1);
-  self.fbPtr[fbOfs] = make_rgba(vec4f(newColor));
-  self.accumBuffer[fbOfs] = vec4f(newColor);
+  const int fbOfs = pixelID.x + lp.fbSize.x * pixelID.y;
+  // lp.fbPtr[fbOfs] = owl::make_rgba(color);
+  vec4f oldColor = lp.accumBuffer[fbOfs];
+  vec4f newColor = (vec4f(color) + float(lp.accumID) * oldColor) / float(lp.accumID + 1);
+  lp.fbPtr[fbOfs] = make_rgba(vec4f(newColor));
+  lp.accumBuffer[fbOfs] = vec4f(newColor);
 
 #ifdef ACTIVATE_CROSSHAIRS
-  if (pixelID.x == self.fbSize.x / 2 || pixelID.y == self.fbSize.y / 2 ||
-      pixelID.x == self.fbSize.x / 2 + 1 || pixelID.y == self.fbSize.y / 2 + 1 ||
-      pixelID.x == self.fbSize.x / 2 - 1 || pixelID.y == self.fbSize.y / 2 - 1)
-    self.fbPtr[fbOfs] = owl::make_rgba(color * 0.33f);
+  if (pixelID.x == lp.fbSize.x / 2 || pixelID.y == lp.fbSize.y / 2 ||
+      pixelID.x == lp.fbSize.x / 2 + 1 || pixelID.y == lp.fbSize.y / 2 + 1 ||
+      pixelID.x == lp.fbSize.x / 2 - 1 || pixelID.y == lp.fbSize.y / 2 - 1)
+    lp.fbPtr[fbOfs] = owl::make_rgba(color * 0.33f);
 #endif
 }
 
@@ -126,6 +128,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(TriangleClosestHit)
 OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
 ()
 {
+  auto& lp = optixLaunchParams;
   const RayGenData &self = owl::getProgramData<RayGenData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
   // if (prd.debug)
@@ -140,7 +143,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
   owl::Ray sampleRay;
   sampleRay.origin = origin;
   sampleRay.direction = direction;
-  owl::traceRay(self.volume.elementTLAS, sampleRay, samplePrd);
+  owl::traceRay(lp.volume.elementTLAS, sampleRay, samplePrd);
   if(prd.debug)
     printf("samplePrd.dataValue: %f\n", samplePrd.dataValue);
 
