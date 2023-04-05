@@ -1,6 +1,7 @@
 #pragma once
 // public owl node-graph API
 #include "owl/owl.h"
+#include "owl/owl_host.h"
 #include "Camera.h"
 #include "CameraManipulator.h"
 #include "DeviceCode.h"
@@ -48,6 +49,8 @@ public:
     int        frameID     { 0 };
     OWLModule module;
 
+    float dt = 0.5f;
+
     std::vector<OWLGeom> elementGeom;
     std::vector<OWLGroup> elementBLAS;
     OWLGroup elementTLAS;
@@ -78,7 +81,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {4,4,4};
+    vec3i macrocellDims = {1,1,1};
 
 
     OWLBuffer colorMapBuffer { 0 };

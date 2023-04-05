@@ -116,9 +116,9 @@ int main(int ac, char **av)
       ImGui::Text("Opacity scale");
       ImGui::SameLine();
       if (ImGui::SliderFloat("##5", &opacity, 0.0f, 1.0f))
-        ;
-      // setOpacityScale(opacity);
-      auto canvasSize = ImGui::GetContentRegionAvail();
+        renderer.SetOpacityScale(opacity);
+      if(ImGui::DragFloat("volume dt", &renderer.dt, 0.01f, 0.0f, 1.0f))
+        renderer.accumID = 0;
       tfn_widget.draw_ui();
     }
     ImGui::End();

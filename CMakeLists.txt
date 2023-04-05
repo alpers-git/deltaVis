@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES 86)
+endif()
 project(deltaVis LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,6 +65,8 @@ embed_ptx(
   SOURCES
     DeviceCode.cu
 )
+
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info")
 
 add_executable(deltaVisViewer
     EntryPoint.cpp

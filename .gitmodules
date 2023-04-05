@@ -1,6 +1,6 @@
 [submodule "submodules/owl"]
 	path = submodules/owl
-	url = https://github.com/owl-project/owl.git
+	url = https://github.com/owl-project/owl/tree/094537da4d2475474262d976e73f1986ab397cca
 [submodule "submodules/umesh"]
 	path = submodules/umesh
 	url = https://gitlab.com/ingowald/umesh.git

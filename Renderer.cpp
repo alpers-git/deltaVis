@@ -53,6 +53,7 @@ OWLVarDecl launchParamVars[] = {
     {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.elementTLAS)},
     {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.macrocellTLAS)},
     {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(LaunchParams, volume.macrocellDims)},
+    {"volume.dt",            OWL_FLOAT, OWL_OFFSETOF(LaunchParams, volume.dt)},
     //transfer function
     {"transferFunction.xf", OWL_USER_TYPE(cudaTextureObject_t), OWL_OFFSETOF(LaunchParams, transferFunction.xf)},
     {"transferFunction.volumeDomain", OWL_FLOAT2, OWL_OFFSETOF(LaunchParams, transferFunction.volumeDomain)},
@@ -80,6 +81,9 @@ namespace deltaVis
     // create a context on the first device:
     context = owlContextCreate(nullptr, 1);
     module = owlModuleCreate(context, deviceCode_ptx);
+    owlContextSetRayTypeCount(context, 2);
+    owlContextSetNumPayloadValues(context, 8);
+
     // ##################################################################
     // set miss and raygen program required for SBT
     // ##################################################################
@@ -160,6 +164,7 @@ namespace deltaVis
 
     owlGeomTypeSetClosestHit(triangleType, 0, module, "TriangleClosestHit");
     owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"DeltaTracking");
+    //owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"AdaptiveDeltaTracking");
 
     owlBuildPrograms(context);
     // owlBuildPipeline(context);
@@ -342,7 +347,7 @@ namespace deltaVis
     auto center = umeshPtr->getBounds().center();
     vec3f eye = vec3f(center.x, center.y, center.z + 2.5f * (umeshPtr->getBounds().upper.z - umeshPtr->getBounds().lower.z));
     camera.setOrientation(eye, vec3f(center.x, center.y, center.z), vec3f(0, 1, 0), 45.0f);
-    camera.motionSpeed = 20.f;
+    camera.motionSpeed = 900.f;
 
     // set up camera controller
     controller = new CameraManipulator(&camera);
@@ -378,6 +383,7 @@ namespace deltaVis
   {
     if (controller->ProcessEvents())
       OnCameraChange();
+    owlParamsSet1f(lp, "volume.dt", dt);
 
     auto glfw = GLFWHandler::getInstance();
     if (glfw->getWindowSize() != fbSize)
