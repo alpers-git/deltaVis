@@ -51,6 +51,8 @@ public:
 
     float dt = 0.5f;
     bool shadows = false;
+    double avgFrameTime = 0.0;
+    double lastFrameTime = 0.0;
 
     std::vector<OWLGeom> elementGeom;
     std::vector<OWLGroup> elementBLAS;

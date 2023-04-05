@@ -37,8 +37,8 @@ namespace deltaVis
         {
             globalBounds.extend(vec4f(vertices[i].x, vertices[i].y, vertices[i].z, scalars[i]));
         }
-        globalBounds.lower -= vec4f(0.01, 0.01, 0.01, 0.0f);
-        globalBounds.upper += vec4f(0.01, 0.01, 0.01, 0.0f);
+        // globalBounds.lower -= vec4f(0.01, 0.01, 0.01, 0.0f);
+        // globalBounds.upper += vec4f(0.01, 0.01, 0.01, 0.0f);
         vec4f cellSize = (globalBounds.upper - globalBounds.lower) / vec4f(dims.x, dims.y, dims.z, 1);
         for (size_t i = 0; i < dims.x; i++)
         {

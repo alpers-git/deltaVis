@@ -29,11 +29,8 @@ vec3i indices[NUM_INDICES] =
     {
         {0, 1, 3}, {2, 3, 0}, {5, 7, 6}, {5, 6, 4}, {0, 4, 5}, {0, 5, 1}, {2, 3, 7}, {2, 7, 6}, {1, 5, 7}, {1, 7, 3}, {4, 0, 2}, {4, 2, 6}};
 
-OWLVarDecl rayGenVars[]
-  = {
-     { nullptr /* sentinel to mark end of list */ }
-  };
-
+OWLVarDecl rayGenVars[] = {
+    {nullptr /* sentinel to mark end of list */}};
 
 OWLVarDecl launchParamVars[] = {
     // framebuffer
@@ -54,8 +51,10 @@ OWLVarDecl launchParamVars[] = {
     {"volume.elementTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.elementTLAS)},
     {"volume.macrocellTLAS", OWL_GROUP, OWL_OFFSETOF(LaunchParams, volume.macrocellTLAS)},
     {"volume.macrocellDims", OWL_INT3, OWL_OFFSETOF(LaunchParams, volume.macrocellDims)},
-    {"volume.dt",            OWL_FLOAT, OWL_OFFSETOF(LaunchParams, volume.dt)},
-    //transfer function
+    {"volume.dt", OWL_FLOAT, OWL_OFFSETOF(LaunchParams, volume.dt)},
+    {"volume.globalBoundsLo", OWL_FLOAT4, OWL_OFFSETOF(LaunchParams, volume.globalBoundsLo)},
+    {"volume.globalBoundsHi", OWL_FLOAT4, OWL_OFFSETOF(LaunchParams, volume.globalBoundsHi)},
+    // transfer function
     {"transferFunction.xf", OWL_USER_TYPE(cudaTextureObject_t), OWL_OFFSETOF(LaunchParams, transferFunction.xf)},
     {"transferFunction.volumeDomain", OWL_FLOAT2, OWL_OFFSETOF(LaunchParams, transferFunction.volumeDomain)},
     {"transferFunction.opacityScale", OWL_FLOAT, OWL_OFFSETOF(LaunchParams, transferFunction.opacityScale)},
@@ -83,7 +82,7 @@ namespace deltaVis
     context = owlContextCreate(nullptr, 1);
     module = owlModuleCreate(context, deviceCode_ptx);
     owlContextSetRayTypeCount(context, 2);
-    owlContextSetNumPayloadValues(context, 8);
+    owlContextSetNumPayloadValues(context, 32);
 
     // ##################################################################
     // set miss and raygen program required for SBT
@@ -106,9 +105,7 @@ namespace deltaVis
     OWLMissProg missProg = owlMissProgCreate(context, module, "miss", sizeof(MissProgData),
                                              missProgVars, -1);
 
-
-
-    lp = owlParamsCreate(context, sizeof(LaunchParams), launchParamVars,-1);
+    lp = owlParamsCreate(context, sizeof(LaunchParams), launchParamVars, -1);
     // -------------------------------------------------------
     // declare geometry type
     // -------------------------------------------------------
@@ -135,7 +132,7 @@ namespace deltaVis
         {"indices", OWL_BUFPTR, OWL_OFFSETOF(TriangleData, indices)},
         {"color", OWL_FLOAT3, OWL_OFFSETOF(TriangleData, color)},
         {/* sentinel to mark end of list */}};
-    
+
     OWLVarDecl macrocellVars[] = {
         {"bboxes", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, bboxes)},
         {"maxima", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, maxima)},
@@ -150,6 +147,7 @@ namespace deltaVis
     triangleType = owlGeomTypeCreate(context, OWL_GEOMETRY_TRIANGLES, sizeof(TriangleData), triangleVars, -1);
 
     // Set intersection programs
+    owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 1, module, "MacrocellIntersection");
     owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 0, module, "VolumeIntersection");
     owlGeomTypeSetIntersectProg(tetrahedraType, /*ray type */ 0, module, "TetrahedraPointQuery");
     owlGeomTypeSetIntersectProg(pyramidType, /*ray type */ 0, module, "PyramidPointQuery");
@@ -165,20 +163,20 @@ namespace deltaVis
 
     owlGeomTypeSetClosestHit(triangleType, 0, module, "TriangleClosestHit");
     owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"DeltaTracking");
-    //owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"AdaptiveDeltaTracking");
+    //owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module, "AdaptiveDeltaTracking");
 
     owlBuildPrograms(context);
     // owlBuildPipeline(context);
 
     frameBuffer = owlHostPinnedBufferCreate(context, OWL_INT, fbSize.x * fbSize.y);
     if (!accumBuffer)
-        accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
+      accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
-    owlParamsSetBuffer(lp, "accumBuffer",accumBuffer);
+    owlParamsSetBuffer(lp, "accumBuffer", accumBuffer);
     accumID = 0;
     frameID = 0;
-    owlParamsSet1i(lp, "accumID",accumID);
-    owlParamsSet1i(lp, "frameID",frameID);
+    owlParamsSet1i(lp, "accumID", accumID);
+    owlParamsSet1i(lp, "frameID", frameID);
     // ##################################################################
     // set up all the *GEOMS* we want to run that code on
     // ##################################################################
@@ -200,7 +198,7 @@ namespace deltaVis
     hexahedraData = owlDeviceBufferCreate(context, OWL_INT, umeshPtr->hexes.size() * 8, nullptr);
     verticesData = owlDeviceBufferCreate(context, OWL_FLOAT3, umeshPtr->vertices.size(), nullptr);
     scalarData = owlDeviceBufferCreate(context, OWL_FLOAT, umeshPtr->perVertex->values.size(), nullptr);
-    
+
     // Upload data
     owlBufferUpload(tetrahedraData, umeshPtr->tets.data());
     owlBufferUpload(pyramidsData, umeshPtr->pyrs.data());
@@ -213,31 +211,31 @@ namespace deltaVis
     box4f *grid = BuildMacrocellGrid(macrocellDims, umeshPtr->vertices.data(),
                                      umeshPtr->perVertex->values.data(), umeshPtr->vertices.size());
     for (int i = 0; i < numMacrocells; i++)
-        std::cout << grid[i].lower << " " << grid[i].upper << std::endl;
+      std::cout << grid[i].lower << " " << grid[i].upper << std::endl;
     OWLBuffer gridBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
     owlBufferUpload(gridBuffer, grid);
     OWLGeom userGeom = owlGeomCreate(context, macrocellType);
     owlGeomSetPrimCount(userGeom, numMacrocells);
-    //owlGeomSet1i(userGeom, "offset", 0);
-    //owlGeomSetBuffer(userGeom, "maxima", nullptr);
+    // owlGeomSet1i(userGeom, "offset", 0);
+    // owlGeomSetBuffer(userGeom, "maxima", nullptr);
     owlGeomSetBuffer(userGeom, "bboxes", gridBuffer);
 
     auto macrocellBLAS = owlUserGeomGroupCreate(context, 1, &userGeom, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellBLAS);
-    macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS, 
-      nullptr, nullptr, OWL_MATRIX_FORMAT_OWL, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+    macrocellTLAS = owlInstanceGroupCreate(context, 1, &macrocellBLAS,
+                                           nullptr, nullptr, OWL_MATRIX_FORMAT_OWL, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
     owlGroupBuildAccel(macrocellTLAS);
     owlParamsSetGroup(lp, "volume.macrocellTLAS", macrocellTLAS);
 
     owlParamsSet3i(lp, "volume.macrocellDims", (const owl3i &)macrocellDims);
-    
-    //delete[] grid;
+
+    // delete[] grid;
     cudaDeviceSynchronize();
 
     if (umeshPtr->tets.size() > 0)
     {
       OWLGeom tetrahedraGeom = owlGeomCreate(context, tetrahedraType);
-      owlGeomSetPrimCount(tetrahedraGeom, umeshPtr->tets.size() *4);
+      owlGeomSetPrimCount(tetrahedraGeom, umeshPtr->tets.size() * 4);
       owlGeomSetBuffer(tetrahedraGeom, "tetrahedra", tetrahedraData);
       owlGeomSetBuffer(tetrahedraGeom, "vertices", verticesData);
       owlGeomSetBuffer(tetrahedraGeom, "scalars", scalarData);
@@ -354,9 +352,15 @@ namespace deltaVis
     controller = new CameraManipulator(&camera);
     OnCameraChange();
 
-    //transfer function
+    // transfer function
     SetOpacityScale(1.0f);
     volDomain = interval<float>({umeshPtr->getBounds4f().lower.w, umeshPtr->getBounds4f().upper.w});
+    owlParamsSet4f(lp, "volume.globalBoundsLo",
+                   owl4f{umeshPtr->getBounds4f().lower.x, umeshPtr->getBounds4f().lower.y,
+                         umeshPtr->getBounds4f().lower.z, umeshPtr->getBounds4f().lower.w});
+    owlParamsSet4f(lp, "volume.globalBoundsHi",
+                   owl4f{umeshPtr->getBounds4f().upper.x, umeshPtr->getBounds4f().upper.y,
+                         umeshPtr->getBounds4f().upper.z, umeshPtr->getBounds4f().upper.w});
     printf("volDomain: %f %f\n", volDomain.lower, volDomain.upper);
     owlParamsSet2f(lp, "transferFunction.volumeDomain", owl2f{volDomain.lower, volDomain.upper});
 
@@ -366,13 +370,21 @@ namespace deltaVis
     owlBuildPrograms(context);
     owlBuildPipeline(context);
     owlBuildSBT(context);
-    delete [] grid;
+    delete[] grid;
   }
 
   void Renderer::Render()
   {
     owlBuildSBT(context);
+    // get time start
+    auto start = std::chrono::high_resolution_clock::now();
     owlLaunch2D(rayGen, fbSize.x, fbSize.y, lp);
+    // get time end
+    auto finish = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finish - start;
+    lastFrameTime = elapsed.count();
+    avgFrameTime = 0.95 * avgFrameTime + 0.05 * elapsed.count();
+
     accumID++;
     frameID++;
     owlParamsSet1i(lp, "accumID", accumID);
@@ -405,9 +417,9 @@ namespace deltaVis
     owlBufferResize(frameBuffer, fbSize.x * fbSize.y);
     owlParamsSet2i(lp, "fbSize", (const owl2i &)fbSize);
     if (!accumBuffer)
-        accumBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,1,nullptr);
+      accumBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, 1, nullptr);
     owlBufferResize(accumBuffer, fbSize.x * fbSize.y);
-    owlParamsSetBuffer(lp, "accumBuffer",accumBuffer);
+    owlParamsSetBuffer(lp, "accumBuffer", accumBuffer);
     OnCameraChange();
   }
 
@@ -419,60 +431,61 @@ namespace deltaVis
 
   void Renderer::SetColorMap(const std::vector<vec4f> &newCM)
   {
-     std::vector<vec4f> CM = newCM;
-    for (uint32_t i = 0; i < CM.size(); ++i) {
+    std::vector<vec4f> CM = newCM;
+    for (uint32_t i = 0; i < CM.size(); ++i)
+    {
       CM[i].w = powf(CM[i].w, 3.f);
     }
-      
+
     this->colorMap = CM;
     if (!colorMapBuffer)
-      colorMapBuffer = owlDeviceBufferCreate(context,OWL_FLOAT4,
-                                             CM.size(),nullptr);
-    owlBufferUpload(colorMapBuffer,CM.data());
-    
-    if (colorMapTexture != 0) {
+      colorMapBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4,
+                                             CM.size(), nullptr);
+    owlBufferUpload(colorMapBuffer, CM.data());
+
+    if (colorMapTexture != 0)
+    {
       (cudaDestroyTextureObject(colorMapTexture));
       colorMapTexture = 0;
     }
 
     cudaResourceDesc res_desc = {};
-    cudaChannelFormatDesc channel_desc
-      = cudaCreateChannelDesc<float4>();
-    
+    cudaChannelFormatDesc channel_desc = cudaCreateChannelDesc<float4>();
+
     // cudaArray_t   voxelArray;
-    if (colorMapArray == 0) {
+    if (colorMapArray == 0)
+    {
       (cudaMallocArray(&colorMapArray,
-                            &channel_desc,
-                            CM.size(),1));
+                       &channel_desc,
+                       CM.size(), 1));
     }
-    
-    int pitch = CM.size()*sizeof(CM[0]);
+
+    int pitch = CM.size() * sizeof(CM[0]);
     (cudaMemcpy2DToArray(colorMapArray,
-                              /* offset */0,0,
-                              CM.data(),
-                              pitch,pitch,1,
-                              cudaMemcpyHostToDevice));
-    
-    res_desc.resType          = cudaResourceTypeArray;
-    res_desc.res.array.array  = colorMapArray;
-    
-    cudaTextureDesc tex_desc     = {};
-    tex_desc.addressMode[0]      = cudaAddressModeClamp;
-    tex_desc.addressMode[1]      = cudaAddressModeClamp;
-    tex_desc.filterMode          = cudaFilterModeLinear;
-    tex_desc.normalizedCoords    = 1;
-    tex_desc.maxAnisotropy       = 1;
+                         /* offset */ 0, 0,
+                         CM.data(),
+                         pitch, pitch, 1,
+                         cudaMemcpyHostToDevice));
+
+    res_desc.resType = cudaResourceTypeArray;
+    res_desc.res.array.array = colorMapArray;
+
+    cudaTextureDesc tex_desc = {};
+    tex_desc.addressMode[0] = cudaAddressModeClamp;
+    tex_desc.addressMode[1] = cudaAddressModeClamp;
+    tex_desc.filterMode = cudaFilterModeLinear;
+    tex_desc.normalizedCoords = 1;
+    tex_desc.maxAnisotropy = 1;
     tex_desc.maxMipmapLevelClamp = 99;
     tex_desc.minMipmapLevelClamp = 0;
-    tex_desc.mipmapFilterMode    = cudaFilterModePoint;
-    tex_desc.borderColor[0]      = 0.0f;
-    tex_desc.borderColor[1]      = 0.0f;
-    tex_desc.borderColor[2]      = 0.0f;
-    tex_desc.borderColor[3]      = 0.0f;
-    tex_desc.sRGB                = 0;
+    tex_desc.mipmapFilterMode = cudaFilterModePoint;
+    tex_desc.borderColor[0] = 0.0f;
+    tex_desc.borderColor[1] = 0.0f;
+    tex_desc.borderColor[2] = 0.0f;
+    tex_desc.borderColor[3] = 0.0f;
+    tex_desc.sRGB = 0;
     (cudaCreateTextureObject(&colorMapTexture, &res_desc, &tex_desc,
-                                  nullptr));
-
+                             nullptr));
 
     // OWLTexture xfTexture
     //   = owlTexture2DCreate(owl,OWL_TEXEL_FORMAT_RGBA32F,
@@ -480,7 +493,6 @@ namespace deltaVis
     //                        colorMap.data());
     owlParamsSetRaw(lp, "transferFunction.xf", &colorMapTexture);
     accumID = 0;
-
   }
 
   void Renderer::OnCameraChange()

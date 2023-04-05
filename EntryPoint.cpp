@@ -121,6 +121,7 @@ int main(int ac, char **av)
         renderer.accumID = 0;
       if(ImGui::Checkbox("Shadows", &renderer.shadows))
           renderer.accumID = 0;
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Avg. FPS: %.1f", 1.0f/renderer.avgFrameTime);
       tfn_widget.draw_ui();
     }
     ImGui::End();

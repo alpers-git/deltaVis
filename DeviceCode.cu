@@ -6,13 +6,11 @@ using namespace owl;
 
 extern "C" __constant__ LaunchParams optixLaunchParams;
 
-#define NUM_BINS 8
-
-#define DEBUG 1
+#define DEBUG 0
 // create a debug function macro that gets called only for center pixel
 inline __device__ bool dbg()
 {
-  auto &lp = optixLaunchParams;
+  auto lp = optixLaunchParams;
 #if DEBUG
   return false;
 #else
@@ -21,6 +19,184 @@ inline __device__ bool dbg()
          (lp.fbSize.y / 2 == pixelID.y);
 #define ACTIVATE_CROSSHAIRS
 #endif
+}
+
+__forceinline__ __device__ int optixGetPayload(int i)
+{
+  switch (i)
+  {
+  case 0:
+    return optixGetPayload_0();
+  case 1:
+    return optixGetPayload_1();
+  case 2:
+    return optixGetPayload_2();
+  case 3:
+    return optixGetPayload_3();
+  case 4:
+    return optixGetPayload_4();
+  case 5:
+    return optixGetPayload_5();
+  case 6:
+    return optixGetPayload_6();
+  case 7:
+    return optixGetPayload_7();
+  case 8:
+    return optixGetPayload_8();
+  case 9:
+    return optixGetPayload_9();
+  case 10:
+    return optixGetPayload_10();
+  case 11:
+    return optixGetPayload_11();
+  case 12:
+    return optixGetPayload_12();
+  case 13:
+    return optixGetPayload_13();
+  case 14:
+    return optixGetPayload_14();
+  case 15:
+    return optixGetPayload_15();
+  case 16:
+    return optixGetPayload_16();
+  case 17:
+    return optixGetPayload_17();
+  case 18:
+    return optixGetPayload_18();
+  case 19:
+    return optixGetPayload_19();
+  case 20:
+    return optixGetPayload_20();
+  case 21:
+    return optixGetPayload_21();
+  case 22:
+    return optixGetPayload_22();
+  case 23:
+    return optixGetPayload_23();
+  case 24:
+    return optixGetPayload_24();
+  case 25:
+    return optixGetPayload_25();
+  case 26:
+    return optixGetPayload_26();
+  case 27:
+    return optixGetPayload_27();
+  case 28:
+    return optixGetPayload_28();
+  case 29:
+    return optixGetPayload_29();
+  case 30:
+    return optixGetPayload_30();
+  case 31:
+    return optixGetPayload_31();
+  default:
+    return 0;
+  }
+}
+
+__forceinline__ __device__ void optixSetPayload(int i, int data)
+{
+  switch (i)
+  {
+  case 0:
+    optixSetPayload_0(data);
+    break;
+  case 1:
+    optixSetPayload_1(data);
+    break;
+  case 2:
+    optixSetPayload_2(data);
+    break;
+  case 3:
+    optixSetPayload_3(data);
+    break;
+  case 4:
+    optixSetPayload_4(data);
+    break;
+  case 5:
+    optixSetPayload_5(data);
+    break;
+  case 6:
+    optixSetPayload_6(data);
+    break;
+  case 7:
+    optixSetPayload_7(data);
+    break;
+  case 8:
+    optixSetPayload_8(data);
+    break;
+  case 9:
+    optixSetPayload_9(data);
+    break;
+  case 10:
+    optixSetPayload_10(data);
+    break;
+  case 11:
+    optixSetPayload_11(data);
+    break;
+  case 12:
+    optixSetPayload_12(data);
+    break;
+  case 13:
+    optixSetPayload_13(data);
+    break;
+  case 14:
+    optixSetPayload_14(data);
+    break;
+  case 15:
+    optixSetPayload_15(data);
+    break;
+  case 16:
+    optixSetPayload_16(data);
+    break;
+  case 17:
+    optixSetPayload_17(data);
+    break;
+  case 18:
+    optixSetPayload_18(data);
+    break;
+  case 19:
+    optixSetPayload_19(data);
+    break;
+  case 20:
+    optixSetPayload_20(data);
+    break;
+  case 21:
+    optixSetPayload_21(data);
+    break;
+  case 22:
+    optixSetPayload_22(data);
+    break;
+  case 23:
+    optixSetPayload_23(data);
+    break;
+  case 24:
+    optixSetPayload_24(data);
+    break;
+  case 25:
+    optixSetPayload_25(data);
+    break;
+  case 26:
+    optixSetPayload_26(data);
+    break;
+  case 27:
+    optixSetPayload_27(data);
+    break;
+  case 28:
+    optixSetPayload_28(data);
+    break;
+  case 29:
+    optixSetPayload_29(data);
+    break;
+  case 30:
+    optixSetPayload_30(data);
+    break;
+  case 31:
+    optixSetPayload_31(data);
+    break;
+  default:
+    break;
+  }
 }
 
 inline __device__ float4 missColor()
@@ -182,25 +358,48 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
                random() * lp.camera.vertical * 0.00005f;
 
   RayPayload prd;
-  prd.missed = true;
-  prd.rgba = vec4f(0, 0, 0, 0);
-  prd.dataValue = 0;
+  //prd.missed = true;
+  // prd.rgba = vec4f(0, 0, 0, 0);
+  // prd.dataValue = 0;
   prd.debug = dbg();
+  // prd.t0 = 0.f;
+  // prd.t1 = 1e20f;
+  // prd.tHit = 1e20f;
+  // owl::traceRay(/*accel to trace against*/ lp.volume.macrocellTLAS,
+  //               /*the ray to trace*/ ray,
+  //               /*prd*/ prd);
+
   prd.t0 = 0.f;
   prd.t1 = 1e20f;
   prd.tHit = 1e20f;
-  owl::traceRay(/*accel to trace against*/ lp.volume.macrocellTLAS,
-                /*the ray to trace*/ ray,
-                /*prd*/ prd);
+  prd.rgba = vec4f(0.f);
+  prd.shadowRay = false;
+  //prd.random = random;
 
+  unsigned int p0 = 0;
+  unsigned int p1 = 0;
+  owl::packPointer(&prd, p0, p1);
+
+  // Volume Integration Ray
+  optixTrace(lp.volume.macrocellTLAS,
+             (const float3 &)ray.origin,
+             (const float3 &)ray.direction,
+             0.f, 1e20f, 0.f,
+             ray.visibilityMask, //(OptixVisibilityMask)-1,
+             /*rayFlags     */ OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+             /*SBToffset    */ 0 /* ray type */,
+             /*SBTstride    */ 2 /* num ray types */,
+             /*missSBTIndex */ 0,
+             p0,
+             p1);
   vec3f albedo = vec3f(prd.rgba);
   float albedo_alpha = prd.rgba.w;
 
   if (lp.shadows)
   {
     owl::Ray shadowRay;
-    shadowRay.origin = ray.origin + ray.direction * prd.tHit*1.1f;
-    shadowRay.direction = {0,1,0}; // ceiling light
+    shadowRay.origin = ray.origin + ray.direction * prd.tHit * 1.1f;
+    shadowRay.direction = {0, 1, 0}; // ceiling light
     RayPayload shadowPrd;
     shadowPrd.missed = true;
     shadowPrd.rgba = vec4f(0, 0, 0, 0);
@@ -336,7 +535,8 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
   const MacrocellData &self = owl::getProgramData<MacrocellData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
   auto &lp = optixLaunchParams;
-  int numAdaptiveRays = 4; // lp.volume.numAdaptiveSamplingRays;
+  int numAdaptiveRays = 32; // lp.volume.numAdaptiveSamplingRays;
+  //printf("called adaptive delta tracking\n");
   for (int asi = 0; asi < numAdaptiveRays; ++asi)
   {
     float t00 = (prd.t1 - prd.t0) * (float(asi + 0.f) / float(numAdaptiveRays)) + prd.t0;
@@ -344,33 +544,31 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
 
     // Coarse Adaptive Sampling Ray
     unsigned int r1[NUM_BINS] = {0};
-    //     optixTrace(lp.volume.macrocellTLAS,
-    //                optixGetWorldRayOrigin(),
-    //                optixGetWorldRayDirection(),
-    //                t00, t11, 0.f,
-    //                (OptixVisibilityMask)-1,
-    //                /*rayFlags     */ OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-    //                /*SBToffset    */ 1 /* ray type */,
-    //                /*SBTstride    */ 2 /* num ray types */,
-    //                /*missSBTIndex */ 0,
-    // #if NUM_BINS == 8
-    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7]
-    // #elif NUM_BINS == 16
-    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15]
-    // #elif NUM_BINS == 32
-    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15], r1[16], r1[17], r1[18], r1[19], r1[20], r1[21], r1[22], r1[23], r1[24], r1[25], r1[26], r1[27], r1[28], r1[29], r1[30], r1[31]
-    // #endif
-    //    );
+    optixTrace(lp.volume.macrocellTLAS,
+               optixGetWorldRayOrigin(),
+               optixGetWorldRayDirection(),
+               t00, t11, 0.f,
+               (OptixVisibilityMask)-1,
+               /*rayFlags     */ OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+               /*SBToffset    */ 1 /* ray type */,
+               /*SBTstride    */ 2 /* num ray types */,
+               /*missSBTIndex */ 1,
+#if NUM_BINS == 8
+               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7]
+#elif NUM_BINS == 16
+               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15]
+#elif NUM_BINS == 32
+               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15], r1[16], r1[17], r1[18], r1[19], r1[20], r1[21], r1[22], r1[23], r1[24], r1[25], r1[26], r1[27], r1[28], r1[29], r1[30], r1[31]
+#endif
+    );
 
     // Move ray to the volume boundary
     vec3f origin = vec3f(optixGetWorldRayOrigin());
     vec3f direction = vec3f(optixGetWorldRayDirection());
 
     vec3f color = vec3f(0.f);
-    float alpha = 0.f;
     int event;
 
-    float weight = 1.f;
     float4 xf = make_float4(0.f, 0.f, 0.f, 0.f);
 
     for (int i = 0; i < NUM_BINS; ++i)
@@ -416,7 +614,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
         //------------------------------------
         if (samplerPrd.dataValue == 0.0f) //(dataValue == sampler.background())
         {
-          xf = make_float4(0.f, 0.f, 0.f, 0.f);
+          xf = make_float4(1.f, 0.f, 1.f, 0.f);
         }
         else
         {
@@ -674,19 +872,88 @@ OPTIX_BOUNDS_PROGRAM(HexahedraBounds)
                    .including(P3)
                    .including(P4)
                    .including(P5)
-                   .including(P6);
-  //.including(P7);
-  primBounds.extend(P7); // wtf??!
+                   .including(P6)
+                   .including(P7);
+  //primBounds.extend(P7); // wtf??!
 }
 
 // ------------------------------------------------------------------
 // intersection programs
 // ------------------------------------------------------------------
 
+OPTIX_INTERSECT_PROGRAM(MacrocellIntersection)
+()
+{
+  //printf("called macrocell intersection program\n");
+  const auto &self = owl::getProgramData<MacrocellData>();
+  const int primID = optixGetPrimitiveIndex();
+  float3 origin = optixGetObjectRayOrigin();
+
+  // Get bbox max
+  float maxima = transferFunction(self.bboxes[primID*2 + 1].w).w;
+
+  /* Skip "splatting" empty bounds */
+  if (maxima <= 0.f)
+    return;
+
+  // note, this is _not_ normalized. Useful for computing world space tmin/mmax
+  float3 direction = optixGetObjectRayDirection();
+
+  // typical ray AABB intersection test
+  float3 dirfrac;
+
+  // direction is unit direction vector of ray
+  dirfrac.x = 1.0f / direction.x;
+  dirfrac.y = 1.0f / direction.y;
+  dirfrac.z = 1.0f / direction.z;
+
+  // lb is the corner of AABB with minimal coordinates - left bottom, rt is maximal corner
+  // origin is origin of ray
+  float4 rt = self.bboxes[primID * 2 + 1];
+  float t2 = (rt.x - origin.x) * dirfrac.x;
+  float t4 = (rt.y - origin.y) * dirfrac.y;
+  float t6 = (rt.z - origin.z) * dirfrac.z;
+
+  float4 lb = self.bboxes[primID * 2 + 0];
+  float t1 = (lb.x - origin.x) * dirfrac.x;
+  float t3 = (lb.y - origin.y) * dirfrac.y;
+  float t5 = (lb.z - origin.z) * dirfrac.z;
+
+  float thit0 = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+  float thit1 = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+
+  // clip hit to near position
+  thit0 = max(thit0, optixGetRayTmin());
+  thit1 = min(thit1, optixGetRayTmax());
+  // if tmax < 0, ray (line) is intersecting AABB, but the whole AABB is behind us
+  if (thit1 < 0)
+  {
+    return;
+  }
+
+  // if tmin > tmax, ray doesn't intersect AABB
+  if (thit0 >= thit1)
+  {
+    return;
+  }
+
+  /* Map the hit min and max tmax to the occupancy bins */
+  float fminhitaddr = (thit0 - optixGetRayTmin()) / (optixGetRayTmax() - optixGetRayTmin());
+  float fmaxhitaddr = (thit1 - optixGetRayTmin()) / (optixGetRayTmax() - optixGetRayTmin());
+  int minhitaddr = min(int(floor(fminhitaddr * (NUM_BINS))), NUM_BINS - 1);
+  int maxhitaddr = min(int(ceil(fmaxhitaddr * (NUM_BINS))), NUM_BINS - 1);
+
+  /* Splat that max value onto the bins */
+  for (int i = minhitaddr; i <= maxhitaddr; ++i)
+  {
+    optixSetPayload(i, __float_as_int(max(__int_as_float(optixGetPayload(i)), maxima)));
+  }
+}
+
 OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
 ()
 {
-  // auto &lp = optixLaunchParams;
+  auto &lp = optixLaunchParams;
   RayPayload &prd = owl::getPRD<RayPayload>();
   const auto &self = owl::getProgramData<MacrocellData>();
   const int primID = optixGetPrimitiveIndex();
@@ -698,6 +965,8 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
     return;
 
   box4f bbox;
+  // bbox.lower = make_vec4f(lp.volume.globalBoundsLo);
+  // bbox.upper = make_vec4f(lp.volume.globalBoundsHi);
   bbox.extend(self.bboxes[2 * primID]).extend(self.bboxes[2 * primID + 1]);
   float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.lower.z);
   float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.upper.z);
@@ -764,6 +1033,10 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   {
     prd.t0 = max(prd.t0, tNear);
     prd.t1 = min(prd.t1, tFar);
+
+    if (prd.debug)
+      printf("Minmax: %f %f\n", prd.t0, prd.t1);
+
     // prd.rng.init(bbox.lower.w, bbox.upper.w);
     //  prd.rgba = make_float4(prd.rng(), prd.rng(), prd.rng(), 1.f);
     prd.dataValue = (bbox.lower.w + bbox.upper.w) * 0.5f;

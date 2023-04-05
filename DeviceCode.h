@@ -12,7 +12,7 @@
 
 using namespace owl;
 
-#define ELEMENTS_PER_BOX 1u
+#define NUM_BINS 32
 
 /* variables for the triangle mesh geometry */
 struct TriangleData
@@ -75,6 +75,9 @@ struct LaunchParams
     vec3i macrocellDims;
     // float* macrocells;
 
+    float4 globalBoundsLo;
+    float4 globalBoundsHi;
+
   } volume;
 
   struct
@@ -110,7 +113,7 @@ struct RayPayload
   float dataValue;
   float tHit;
   int samples;
-  // float maxima[NUM_BINS];
+  float maxima[NUM_BINS];
   bool shadowRay;
   bool missed;
   bool debug;
