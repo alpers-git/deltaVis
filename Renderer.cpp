@@ -39,6 +39,7 @@ OWLVarDecl launchParamVars[] = {
     // framebuffer
     {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, fbPtr)},
     {"fbSize", OWL_INT2, OWL_OFFSETOF(LaunchParams, fbSize)},
+    {"shadows", OWL_BOOL, OWL_OFFSETOF(LaunchParams, shadows)},
     // accum buffer
     {"accumID", OWL_INT, OWL_OFFSETOF(LaunchParams, accumID)},
     {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
@@ -137,7 +138,7 @@ namespace deltaVis
     
     OWLVarDecl macrocellVars[] = {
         {"bboxes", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, bboxes)},
-        //{"maxima", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, maxima)},
+        {"maxima", OWL_BUFPTR, OWL_OFFSETOF(MacrocellData, maxima)},
         {/* sentinel to mark end of list */}};
 
     // Declare the geometry types
@@ -151,15 +152,15 @@ namespace deltaVis
     // Set intersection programs
     owlGeomTypeSetIntersectProg(macrocellType, /*ray type */ 0, module, "VolumeIntersection");
     owlGeomTypeSetIntersectProg(tetrahedraType, /*ray type */ 0, module, "TetrahedraPointQuery");
-    // owlGeomTypeSetIntersectProg(pyramidType, /*ray type */ 0, module, "PyramidPointQuery");
-    // owlGeomTypeSetIntersectProg(wedgeType, /*ray type */ 0, module, "WedgePointQuery");
-    // owlGeomTypeSetIntersectProg(hexahedraType, /*ray type */ 0, module, "HexahedraPointQuery");
+    owlGeomTypeSetIntersectProg(pyramidType, /*ray type */ 0, module, "PyramidPointQuery");
+    owlGeomTypeSetIntersectProg(wedgeType, /*ray type */ 0, module, "WedgePointQuery");
+    owlGeomTypeSetIntersectProg(hexahedraType, /*ray type */ 0, module, "HexahedraPointQuery");
 
     // Set boundary programs
     owlGeomTypeSetBoundsProg(tetrahedraType, module, "TetrahedraBounds");
-    // owlGeomTypeSetBoundsProg(pyramidType, module, "PyramidBounds");
-    // owlGeomTypeSetBoundsProg(wedgeType, module, "WedgeBounds");
-    // owlGeomTypeSetBoundsProg(hexahedraType, module, "HexahedraBounds");
+    owlGeomTypeSetBoundsProg(pyramidType, module, "PyramidBounds");
+    owlGeomTypeSetBoundsProg(wedgeType, module, "WedgeBounds");
+    owlGeomTypeSetBoundsProg(hexahedraType, module, "HexahedraBounds");
     owlGeomTypeSetBoundsProg(macrocellType, module, "MacrocellBounds");
 
     owlGeomTypeSetClosestHit(triangleType, 0, module, "TriangleClosestHit");
@@ -230,7 +231,7 @@ namespace deltaVis
 
     owlParamsSet3i(lp, "volume.macrocellDims", (const owl3i &)macrocellDims);
     
-    delete[] grid;
+    //delete[] grid;
     cudaDeviceSynchronize();
 
     if (umeshPtr->tets.size() > 0)
@@ -347,7 +348,7 @@ namespace deltaVis
     auto center = umeshPtr->getBounds().center();
     vec3f eye = vec3f(center.x, center.y, center.z + 2.5f * (umeshPtr->getBounds().upper.z - umeshPtr->getBounds().lower.z));
     camera.setOrientation(eye, vec3f(center.x, center.y, center.z), vec3f(0, 1, 0), 45.0f);
-    camera.motionSpeed = 900.f;
+    camera.motionSpeed = 10.f;
 
     // set up camera controller
     controller = new CameraManipulator(&camera);
@@ -365,6 +366,7 @@ namespace deltaVis
     owlBuildPrograms(context);
     owlBuildPipeline(context);
     owlBuildSBT(context);
+    delete [] grid;
   }
 
   void Renderer::Render()
@@ -384,6 +386,7 @@ namespace deltaVis
     if (controller->ProcessEvents())
       OnCameraChange();
     owlParamsSet1f(lp, "volume.dt", dt);
+    owlParamsSet1b(lp, "shadows", shadows);
 
     auto glfw = GLFWHandler::getInstance();
     if (glfw->getWindowSize() != fbSize)

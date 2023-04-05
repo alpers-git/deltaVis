@@ -118,8 +118,7 @@ inline __device__
   if (f < lp.transferFunction.volumeDomain.x ||
       f > lp.transferFunction.volumeDomain.y)
   {
-    // gradient = 0.f;
-    return make_float4(1.f, 0.f, 1.f, 0.5f);
+    return make_float4(1.f, 0.f, 1.f, 0.0f);
   }
   float remapped = (f - lp.transferFunction.volumeDomain.x) /
                    (lp.transferFunction.volumeDomain.y - lp.transferFunction.volumeDomain.x);
@@ -179,8 +178,8 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   const vec2f screen = (vec2f(pixelID) + vec2f(.5f)) / vec2f(lp.fbSize);
   owl::Ray ray;
   generateRay(screen, ray);
-  ray.origin = ray.origin + random() * lp.camera.horizontal/2.f +
-               random() * lp.camera.vertical/2.f;
+  ray.origin = ray.origin + random() * lp.camera.horizontal * 0.00005f +
+               random() * lp.camera.vertical * 0.00005f;
 
   RayPayload prd;
   prd.missed = true;
@@ -194,10 +193,35 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
                 /*the ray to trace*/ ray,
                 /*prd*/ prd);
 
-  // map prd.dataValue to color
-  //float4 tfColor = transferFunction(prd.dataValue);
+  vec3f albedo = vec3f(prd.rgba);
+  float albedo_alpha = prd.rgba.w;
 
-  vec4f color = make_vec4f(prd.rgba); //prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
+  if (lp.shadows)
+  {
+    owl::Ray shadowRay;
+    shadowRay.origin = ray.origin + ray.direction * prd.tHit*1.1f;
+    shadowRay.direction = {0,1,0}; // ceiling light
+    RayPayload shadowPrd;
+    shadowPrd.missed = true;
+    shadowPrd.rgba = vec4f(0, 0, 0, 0);
+    shadowPrd.dataValue = 0;
+    shadowPrd.debug = dbg();
+    shadowPrd.t0 = 0.5f;
+    shadowPrd.t1 = 1e20f;
+    shadowPrd.tHit = 1e20f;
+    owl::traceRay(/*accel to trace against*/ lp.volume.macrocellTLAS,
+                  /*the ray to trace*/ shadowRay,
+                  /*prd*/ shadowPrd);
+
+    vec3f shadow = vec3f((1.f - 0.2f) * (1.f - shadowPrd.rgba.w) + 0.2f);
+    float light_intensity = 2.0f;
+    albedo = albedo * shadow * light_intensity;
+  }
+
+  // map prd.dataValue to color
+  // float4 tfColor = transferFunction(prd.dataValue);
+
+  vec4f color = vec4f(albedo, albedo_alpha); // prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
 
   // vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
   color = over(color, vec4f(owl::getProgramData<MissProgData>().color1, 1.0f));
@@ -252,10 +276,10 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
   // RayPayload prd;
   prd.dataValue = 0.f;
 
-  float majorantExtinction = self.bboxes[1].w;
+  float majorantExtinction = transferFunction(self.bboxes[1].w).w;
   // normalize the majorant
-  majorantExtinction = (majorantExtinction - lp.transferFunction.volumeDomain.x) /
-                       (lp.transferFunction.volumeDomain.y - lp.transferFunction.volumeDomain.x);
+  // majorantExtinction = (majorantExtinction - lp.transferFunction.volumeDomain.x) /
+  //                      (lp.transferFunction.volumeDomain.y - lp.transferFunction.volumeDomain.x);
 
   // majorantExtinction = 1.4f;
   if (majorantExtinction == 0.f)
@@ -318,25 +342,25 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
     float t00 = (prd.t1 - prd.t0) * (float(asi + 0.f) / float(numAdaptiveRays)) + prd.t0;
     float t11 = (prd.t1 - prd.t0) * (float(asi + 1.f) / float(numAdaptiveRays)) + prd.t0;
 
-     // Coarse Adaptive Sampling Ray
+    // Coarse Adaptive Sampling Ray
     unsigned int r1[NUM_BINS] = {0};
-    optixTrace(lp.volume.macrocellTLAS,
-               optixGetWorldRayOrigin(),
-               optixGetWorldRayDirection(),
-               t00, t11, 0.f,
-               (OptixVisibilityMask)-1,
-               /*rayFlags     */ OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-               /*SBToffset    */ 1 /* ray type */,
-               /*SBTstride    */ 2 /* num ray types */,
-               /*missSBTIndex */ 0,
-#if NUM_BINS == 8
-               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7]
-#elif NUM_BINS == 16
-               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15]
-#elif NUM_BINS == 32
-               r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15], r1[16], r1[17], r1[18], r1[19], r1[20], r1[21], r1[22], r1[23], r1[24], r1[25], r1[26], r1[27], r1[28], r1[29], r1[30], r1[31]
-#endif
-    );
+    //     optixTrace(lp.volume.macrocellTLAS,
+    //                optixGetWorldRayOrigin(),
+    //                optixGetWorldRayDirection(),
+    //                t00, t11, 0.f,
+    //                (OptixVisibilityMask)-1,
+    //                /*rayFlags     */ OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+    //                /*SBToffset    */ 1 /* ray type */,
+    //                /*SBTstride    */ 2 /* num ray types */,
+    //                /*missSBTIndex */ 0,
+    // #if NUM_BINS == 8
+    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7]
+    // #elif NUM_BINS == 16
+    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15]
+    // #elif NUM_BINS == 32
+    //                r1[0], r1[1], r1[2], r1[3], r1[4], r1[5], r1[6], r1[7], r1[8], r1[9], r1[10], r1[11], r1[12], r1[13], r1[14], r1[15], r1[16], r1[17], r1[18], r1[19], r1[20], r1[21], r1[22], r1[23], r1[24], r1[25], r1[26], r1[27], r1[28], r1[29], r1[30], r1[31]
+    // #endif
+    //    );
 
     // Move ray to the volume boundary
     vec3f origin = vec3f(optixGetWorldRayOrigin());
@@ -476,7 +500,7 @@ OPTIX_MISS_PROGRAM(miss)
 
   RayPayload &prd = owl::getPRD<RayPayload>();
   // int pattern = (pixelID.x / 18) ^ (pixelID.y / 18);
-  prd.rgba = missColor();//vec4f(self.color1, 1); //(pattern & 1) ? vec4f(self.color1, 1) : vec4f(self.color0, 1);
+  prd.rgba = missColor(); // vec4f(self.color1, 1); //(pattern & 1) ? vec4f(self.color1, 1) : vec4f(self.color0, 1);
   prd.missed = true;
 }
 
@@ -543,176 +567,117 @@ OPTIX_BOUNDS_PROGRAM(TetrahedraBounds)
                    .including(P3);
 }
 
-// OPTIX_BOUNDS_PROGRAM(PyramidBounds)(
-//   const void  *geomData,
-//   owl::common::box3f &primBounds,
-//   const int    primID,
-//   const int    key)
+OPTIX_BOUNDS_PROGRAM(PyramidBounds)
+(
+    const void *geomData,
+    owl::common::box3f &primBounds,
+    const int primID,
+    const int key)
 
-// {
-//   const UnstructuredElementData &self = *(const UnstructuredElementData*)geomData;
-//   primBounds = box3f();
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
-//     uint32_t ID = (uint32_t(primID) + self.offset) * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numPyramids) return;
+{
+  const UnstructuredElementData &self = *(const UnstructuredElementData *)geomData;
+  primBounds = box3f();
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
+  if (ID >= self.numPyramids)
+    return;
 
-//     uint64_t i0, i1, i2, i3, i4;
-//     if (self.bytesPerIndex == 1) {
-//       uint8_t* pyrs = (uint8_t*)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     } else if (self.bytesPerIndex == 2) {
-//       uint16_t* pyrs = (uint16_t*)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     } else {
-//       uint32_t* pyrs = (uint32_t*)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     }
+  unsigned int *pyrs = (unsigned int *)self.pyramids;
+  uint64_t i0 = pyrs[ID * 5 + 0];
+  uint64_t i1 = pyrs[ID * 5 + 1];
+  uint64_t i2 = pyrs[ID * 5 + 2];
+  uint64_t i3 = pyrs[ID * 5 + 3];
+  uint64_t i4 = pyrs[ID * 5 + 4];
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
-//     primBounds = primBounds
-//       .including(P0)
-//       .including(P1)
-//       .including(P2)
-//       .including(P3)
-//       .including(P4);
-//   }
-// }
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
 
-// OPTIX_BOUNDS_PROGRAM(WedgeBounds)(
-//   const void  *geomData,
-//   owl::common::box3f &primBounds,
-//   const int    primID,
-//   const int    key)
-// {
-//   const UnstructuredElementData &self = *(const UnstructuredElementData*)geomData;
-//   primBounds = box3f();
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
-//     uint32_t ID = (uint32_t(primID) + self.offset) * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numWedges) return;
+  primBounds = primBounds.including(P0)
+                   .including(P1)
+                   .including(P2)
+                   .including(P3)
+                   .including(P4);
+}
 
-//     uint64_t i0, i1, i2, i3, i4, i5;
-//     if (self.bytesPerIndex == 1) {
-//       uint8_t* wed = (uint8_t*)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     } else if (self.bytesPerIndex == 2) {
-//       uint16_t* wed = (uint16_t*)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     } else {
-//       uint32_t* wed = (uint32_t*)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     }
+OPTIX_BOUNDS_PROGRAM(WedgeBounds)
+(
+    const void *geomData,
+    owl::common::box3f &primBounds,
+    const int primID,
+    const int key)
+{
+  const UnstructuredElementData &self = *(const UnstructuredElementData *)geomData;
+  primBounds = box3f();
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
+  if (ID >= self.numWedges)
+    return;
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
-//     vec3f P5 = self.vertices[i5];
-//     primBounds = primBounds
-//       .including(P0)
-//       .including(P1)
-//       .including(P2)
-//       .including(P3)
-//       .including(P4)
-//       .including(P5);
-//   }
-// }
+  unsigned int *weds = (unsigned int *)self.wedges;
+  uint64_t i0 = weds[ID * 6 + 0];
+  uint64_t i1 = weds[ID * 6 + 1];
+  uint64_t i2 = weds[ID * 6 + 2];
+  uint64_t i3 = weds[ID * 6 + 3];
+  uint64_t i4 = weds[ID * 6 + 4];
+  uint64_t i5 = weds[ID * 6 + 5];
 
-// OPTIX_BOUNDS_PROGRAM(HexahedraBounds)(
-//   const void  *geomData,
-//   owl::common::box3f &primBounds,
-//   const int    primID,
-//   const int    key)
-// {
-//   const UnstructuredElementData &self = *(const UnstructuredElementData*)geomData;
-//   primBounds = box3f();
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
-//     uint32_t ID = (uint32_t(primID) + self.offset) * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numHexahedra) return;
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
+  vec3f P5 = self.vertices[i5];
 
-//     uint64_t i0, i1, i2, i3, i4, i5, i6, i7;
-//     if (self.bytesPerIndex == 1) {
-//       uint8_t* hexes = (uint8_t*)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     } else if (self.bytesPerIndex == 2) {
-//       uint16_t* hexes = (uint16_t*)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     } else {
-//       uint32_t* hexes = (uint32_t*)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     }
+  primBounds = primBounds.including(P0)
+                   .including(P1)
+                   .including(P2)
+                   .including(P3)
+                   .including(P4)
+                   .including(P5);
+}
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
-//     vec3f P5 = self.vertices[i5];
-//     vec3f P6 = self.vertices[i6];
-//     vec3f P7 = self.vertices[i7];
-//     primBounds = primBounds
-//     .including(P0)
-//     .including(P1)
-//     .including(P2)
-//     .including(P3)
-//     .including(P4)
-//     .including(P5)
-//     .including(P6)
-//     .including(P7);
-//   }
-// }
+OPTIX_BOUNDS_PROGRAM(HexahedraBounds)
+(
+    const void *geomData,
+    owl::common::box3f &primBounds,
+    const int primID,
+    const int key)
+{
+  const UnstructuredElementData &self = *(const UnstructuredElementData *)geomData;
+  primBounds = box3f();
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
+  if (ID >= self.numHexahedra)
+    return;
+
+  unsigned int *hexes = (unsigned int *)self.hexahedra;
+  uint64_t i0 = hexes[ID * 8 + 0];
+  uint64_t i1 = hexes[ID * 8 + 1];
+  uint64_t i2 = hexes[ID * 8 + 2];
+  uint64_t i3 = hexes[ID * 8 + 3];
+  uint64_t i4 = hexes[ID * 8 + 4];
+  uint64_t i5 = hexes[ID * 8 + 5];
+  uint64_t i6 = hexes[ID * 8 + 6];
+  uint64_t i7 = hexes[ID * 8 + 7];
+
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
+  vec3f P5 = self.vertices[i5];
+  vec3f P6 = self.vertices[i6];
+  vec3f P7 = self.vertices[i7];
+  primBounds = primBounds.including(P0)
+                   .including(P1)
+                   .including(P2)
+                   .including(P3)
+                   .including(P4)
+                   .including(P5)
+                   .including(P6);
+  //.including(P7);
+  primBounds.extend(P7); // wtf??!
+}
 
 // ------------------------------------------------------------------
 // intersection programs
@@ -729,8 +694,8 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   // // avoid intersecting the same brick twice
   // // if (primID == prd.prevNode) return;
 
-  // if (prd.rgba.w > .99f)
-  //   return;
+  if (prd.rgba.w > .99f)
+    return;
 
   box4f bbox;
   bbox.extend(self.bboxes[2 * primID]).extend(self.bboxes[2 * primID + 1]);
@@ -854,228 +819,171 @@ OPTIX_INTERSECT_PROGRAM(TetrahedraPointQuery)
   }
 }
 
-// OPTIX_INTERSECT_PROGRAM(PyramidPointQuery)
-// ()
-// {
-//   RayPayload &prd = owl::getPRD<RayPayload>();
-//   const auto &self = owl::getProgramData<UnstructuredElementData>();
-//   uint64_t primID = optixGetPrimitiveIndex() + self.offset;
-//   float3 origin = optixGetObjectRayOrigin();
+OPTIX_INTERSECT_PROGRAM(PyramidPointQuery)
+()
+{
+  RayPayload &prd = owl::getPRD<RayPayload>();
+  const auto &self = owl::getProgramData<UnstructuredElementData>();
+  unsigned int primID = optixGetPrimitiveIndex(); //+ self.offset;
+  float3 origin = optixGetObjectRayOrigin();
 
-//   // float maxima = self.maxima[self.numTetrahedra + primID];
-//   // if (maxima <= 0.f) return;
+  // for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
+  //   uint32_t ID = primID * ELEMENTS_PER_BOX + i;
+  if (primID >= self.numPyramids)
+    return;
 
-//   vec3f P = {origin.x, origin.y, origin.z};
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i)
-//   {
-//     uint32_t ID = primID * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numPyramids)
-//       return;
+  // printf("TetrahedraPointQuery: primID = %d\\n", primID);
 
-//     uint64_t i0, i1, i2, i3, i4;
-//     if (self.bytesPerIndex == 1)
-//     {
-//       uint8_t *pyrs = (uint8_t *)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     }
-//     else if (self.bytesPerIndex == 2)
-//     {
-//       uint16_t *pyrs = (uint16_t *)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     }
-//     else
-//     {
-//       uint32_t *pyrs = (uint32_t *)self.pyramids;
-//       i0 = pyrs[ID * 5 + 0];
-//       i1 = pyrs[ID * 5 + 1];
-//       i2 = pyrs[ID * 5 + 2];
-//       i3 = pyrs[ID * 5 + 3];
-//       i4 = pyrs[ID * 5 + 4];
-//     }
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
+  vec3f P = {origin.x, origin.y, origin.z};
 
-//     float S0 = self.scalars[i0];
-//     float S1 = self.scalars[i1];
-//     float S2 = self.scalars[i2];
-//     float S3 = self.scalars[i3];
-//     float S4 = self.scalars[i4];
+  // unsigned int i0, i1, i2, i3;
+  uint32_t *pyrs = (uint32_t *)self.pyramids;
+  uint64_t i0 = pyrs[ID * 5 + 0];
+  uint64_t i1 = pyrs[ID * 5 + 1];
+  uint64_t i2 = pyrs[ID * 5 + 2];
+  uint64_t i3 = pyrs[ID * 5 + 3];
+  uint64_t i4 = pyrs[ID * 5 + 4];
 
-//     if (interpolatePyramid(P, P0, P1, P2, P3, P4, S0, S1, S2, S3, S4, prd.dataValue))
-//     {
-//       optixReportIntersection(0.f, 0);
-//       return;
-//     }
-//   }
-// }
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
 
-// OPTIX_INTERSECT_PROGRAM(WedgePointQuery)
-// ()
-// {
-//   RayPayload &prd = owl::getPRD<RayPayload>();
-//   const auto &self = owl::getProgramData<UnstructuredElementData>();
-//   uint64_t primID = optixGetPrimitiveIndex() + self.offset;
-//   float3 origin = optixGetObjectRayOrigin();
+  float S0 = self.scalars[i0];
+  float S1 = self.scalars[i1];
+  float S2 = self.scalars[i2];
+  float S3 = self.scalars[i3];
+  float S4 = self.scalars[i4];
 
-//   // float maxima = self.maxima[self.numTetrahedra + self.numPyramids + primID];
-//   // if (maxima <= 0.f) return;
+  // prd.missed = false;              // for
+  // prd.dataValue = S0;              // testing
+  // optixReportIntersection(0.f, 0); // please
+  // return;                          // remove
 
-//   vec3f P = {origin.x, origin.y, origin.z};
+  if (interpolatePyramid(P, P0, P1, P2, P3, P4, S0, S1, S2, S3, S4, prd.dataValue))
+  {
+    optixReportIntersection(0.f, 0);
+    prd.missed = false;
+    return;
+  }
+}
 
-//   // primID -= wedOffset;
+OPTIX_INTERSECT_PROGRAM(WedgePointQuery)
+()
+{
+  RayPayload &prd = owl::getPRD<RayPayload>();
+  const auto &self = owl::getProgramData<UnstructuredElementData>();
+  unsigned int primID = optixGetPrimitiveIndex(); //+ self.offset;
+  float3 origin = optixGetObjectRayOrigin();
 
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i)
-//   {
-//     uint32_t ID = primID * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numWedges)
-//       return;
+  // for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
+  //   uint32_t ID = primID * ELEMENTS_PER_BOX + i;
+  if (primID >= self.numWedges)
+    return;
 
-//     uint64_t i0, i1, i2, i3, i4, i5;
-//     if (self.bytesPerIndex == 1)
-//     {
-//       uint8_t *wed = (uint8_t *)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     }
-//     else if (self.bytesPerIndex == 2)
-//     {
-//       uint16_t *wed = (uint16_t *)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     }
-//     else
-//     {
-//       uint32_t *wed = (uint32_t *)self.wedges;
-//       i0 = wed[ID * 6 + 0];
-//       i1 = wed[ID * 6 + 1];
-//       i2 = wed[ID * 6 + 2];
-//       i3 = wed[ID * 6 + 3];
-//       i4 = wed[ID * 6 + 4];
-//       i5 = wed[ID * 6 + 5];
-//     }
+  // printf("TetrahedraPointQuery: primID = %d\\n", primID);
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
-//     vec3f P5 = self.vertices[i5];
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
 
-//     float S0 = self.scalars[i0];
-//     float S1 = self.scalars[i1];
-//     float S2 = self.scalars[i2];
-//     float S3 = self.scalars[i3];
-//     float S4 = self.scalars[i4];
-//     float S5 = self.scalars[i5];
+  vec3f P = {origin.x, origin.y, origin.z};
 
-//     if (interpolateWedge(P, P0, P1, P2, P3, P4, P5, S0, S1, S2, S3, S4, S5, prd.dataValue))
-//     {
-//       optixReportIntersection(0.f, 0);
-//       return;
-//     }
-//   }
-// }
+  // unsigned int i0, i1, i2, i3;
+  uint32_t *weds = (uint32_t *)self.wedges;
+  uint64_t i0 = weds[ID * 6 + 0];
+  uint64_t i1 = weds[ID * 6 + 1];
+  uint64_t i2 = weds[ID * 6 + 2];
+  uint64_t i3 = weds[ID * 6 + 3];
+  uint64_t i4 = weds[ID * 6 + 4];
+  uint64_t i5 = weds[ID * 6 + 5];
 
-// OPTIX_INTERSECT_PROGRAM(HexahedraPointQuery)
-// ()
-// {
-//   RayPayload &prd = owl::getPRD<RayPayload>();
-//   const auto &self = owl::getProgramData<UnstructuredElementData>();
-//   uint64_t primID = optixGetPrimitiveIndex() + self.offset;
-//   float3 origin = optixGetObjectRayOrigin();
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
+  vec3f P5 = self.vertices[i5];
 
-//   // float maxima = self.maxima[self.numTetrahedra + self.numPyramids + self.numWedges + primID];
-//   // if (maxima <= 0.f) return;
+  float S0 = self.scalars[i0];
+  float S1 = self.scalars[i1];
+  float S2 = self.scalars[i2];
+  float S3 = self.scalars[i3];
+  float S4 = self.scalars[i4];
+  float S5 = self.scalars[i5];
 
-//   vec3f P = {origin.x, origin.y, origin.z};
+  // prd.missed = false;              // for
+  // prd.dataValue = S0;              // testing
+  // optixReportIntersection(0.f, 0); // please
+  // return;                          // remove
 
-//   // primID -= hexOffset;
-//   for (int i = 0; i < ELEMENTS_PER_BOX; ++i)
-//   {
-//     uint32_t ID = primID * ELEMENTS_PER_BOX + i;
-//     if (ID >= self.numHexahedra)
-//       return;
+  if (interpolateWedge(P, P0, P1, P2, P3, P4, P5, S0, S1, S2, S3, S4, S5, prd.dataValue))
+  {
+    optixReportIntersection(0.f, 0);
+    prd.missed = false;
+    return;
+  }
+}
 
-//     uint64_t i0, i1, i2, i3, i4, i5, i6, i7;
-//     if (self.bytesPerIndex == 1)
-//     {
-//       uint8_t *hexes = (uint8_t *)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     }
-//     else if (self.bytesPerIndex == 2)
-//     {
-//       uint16_t *hexes = (uint16_t *)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     }
-//     else
-//     {
-//       uint32_t *hexes = (uint32_t *)self.hexahedra;
-//       i0 = hexes[ID * 8 + 0];
-//       i1 = hexes[ID * 8 + 1];
-//       i2 = hexes[ID * 8 + 2];
-//       i3 = hexes[ID * 8 + 3];
-//       i4 = hexes[ID * 8 + 4];
-//       i5 = hexes[ID * 8 + 5];
-//       i6 = hexes[ID * 8 + 6];
-//       i7 = hexes[ID * 8 + 7];
-//     }
+OPTIX_INTERSECT_PROGRAM(HexahedraPointQuery)
+()
+{
+  RayPayload &prd = owl::getPRD<RayPayload>();
+  const auto &self = owl::getProgramData<UnstructuredElementData>();
+  unsigned int primID = optixGetPrimitiveIndex(); //+ self.offset;
+  float3 origin = optixGetObjectRayOrigin();
 
-//     vec3f P0 = self.vertices[i0];
-//     vec3f P1 = self.vertices[i1];
-//     vec3f P2 = self.vertices[i2];
-//     vec3f P3 = self.vertices[i3];
-//     vec3f P4 = self.vertices[i4];
-//     vec3f P5 = self.vertices[i5];
-//     vec3f P6 = self.vertices[i6];
-//     vec3f P7 = self.vertices[i7];
+  // for (int i = 0; i < ELEMENTS_PER_BOX; ++i) {
+  //   uint32_t ID = primID * ELEMENTS_PER_BOX + i;
+  if (primID >= self.numHexahedra)
+    return;
 
-//     float S0 = self.scalars[i0];
-//     float S1 = self.scalars[i1];
-//     float S2 = self.scalars[i2];
-//     float S3 = self.scalars[i3];
-//     float S4 = self.scalars[i4];
-//     float S5 = self.scalars[i5];
-//     float S6 = self.scalars[i6];
-//     float S7 = self.scalars[i7];
+  // printf("TetrahedraPointQuery: primID = %d\\n", primID);
 
-//     if (interpolateHexahedra(P, P0, P1, P2, P3, P4, P5, P6, P7, S0, S1, S2, S3, S4, S5, S6, S7, prd.dataValue))
-//     {
-//       optixReportIntersection(0.f, 0);
-//       return;
-//     }
-//   }
-// }
+  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
+
+  vec3f P = {origin.x, origin.y, origin.z};
+
+  // unsigned int i0, i1, i2, i3;
+  uint32_t *hexes = (uint32_t *)self.hexahedra;
+  uint64_t i0 = hexes[ID * 8 + 0];
+  uint64_t i1 = hexes[ID * 8 + 1];
+  uint64_t i2 = hexes[ID * 8 + 2];
+  uint64_t i3 = hexes[ID * 8 + 3];
+  uint64_t i4 = hexes[ID * 8 + 4];
+  uint64_t i5 = hexes[ID * 8 + 5];
+  uint64_t i6 = hexes[ID * 8 + 6];
+  uint64_t i7 = hexes[ID * 8 + 7];
+
+  vec3f P0 = self.vertices[i0];
+  vec3f P1 = self.vertices[i1];
+  vec3f P2 = self.vertices[i2];
+  vec3f P3 = self.vertices[i3];
+  vec3f P4 = self.vertices[i4];
+  vec3f P5 = self.vertices[i5];
+  vec3f P6 = self.vertices[i6];
+  vec3f P7 = self.vertices[i7];
+
+  float S0 = self.scalars[i0];
+  float S1 = self.scalars[i1];
+  float S2 = self.scalars[i2];
+  float S3 = self.scalars[i3];
+  float S4 = self.scalars[i4];
+  float S5 = self.scalars[i5];
+  float S6 = self.scalars[i6];
+  float S7 = self.scalars[i7];
+
+  // prd.missed = false;              // for
+  // prd.dataValue = S0;              // testing
+  // optixReportIntersection(0.f, 0); // please
+  // return;                          // remove
+
+  if (interpolateHexahedra(P, P0, P1, P2, P3, P4, P5, P6, P7,
+                           S0, S1, S2, S3, S4, S5, S6, S7, prd.dataValue))
+  {
+    optixReportIntersection(0.f, 0);
+    prd.missed = false;
+    return;
+  }
+}

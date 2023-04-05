@@ -46,7 +46,7 @@ struct UnstructuredElementData
 struct MacrocellData
 {
   float4 *bboxes;
-  // float* maxima;
+  float* maxima;
   // int offset; // for pre-split geom
 };
 
@@ -60,6 +60,7 @@ struct LaunchParams
   uint32_t accumID;
 
   OptixTraversableHandle triangleTLAS;
+  bool shadows;
 
   struct
   {
