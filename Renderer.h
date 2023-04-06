@@ -30,6 +30,7 @@ public:
     void Resize(const vec2i newSize);
     void SetOpacityScale(float scale);
     void SetColorMap(const std::vector<owl::vec4f> &newXF);
+    void SetLightDir(const owl::vec3f &newDir);
 
     void Shutdown();
 
@@ -51,6 +52,7 @@ public:
 
     float dt = 0.5f;
     bool shadows = false;
+    vec3f lightDir = normalize(vec3f(0.f,-1.f,0.f));
     double avgFrameTime = 0.0;
     double lastFrameTime = 0.0;
 

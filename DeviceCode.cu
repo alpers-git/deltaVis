@@ -6,7 +6,7 @@ using namespace owl;
 
 extern "C" __constant__ LaunchParams optixLaunchParams;
 
-#define DEBUG 0
+#define DEBUG 1
 // create a debug function macro that gets called only for center pixel
 inline __device__ bool dbg()
 {
@@ -201,7 +201,7 @@ __forceinline__ __device__ void optixSetPayload(int i, int data)
 
 inline __device__ float4 missColor()
 {
-  return make_float4(0.0f, 0.0f, 0.01f, 1.0f);
+  return make_float4(0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 // inline __device__ vec4f missColor()
@@ -354,8 +354,8 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   const vec2f screen = (vec2f(pixelID) + vec2f(.5f)) / vec2f(lp.fbSize);
   owl::Ray ray;
   generateRay(screen, ray);
-  ray.origin = ray.origin + random() * lp.camera.horizontal * 0.00005f +
-               random() * lp.camera.vertical * 0.00005f;
+  // ray.origin = ray.origin + random() * lp.camera.horizontal * 0.0005f +
+  //              random() * lp.camera.vertical * 0.0005f;
 
   RayPayload prd;
   //prd.missed = true;
@@ -398,20 +398,23 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   if (lp.shadows)
   {
     owl::Ray shadowRay;
-    shadowRay.origin = ray.origin + ray.direction * prd.tHit * 1.1f;
-    shadowRay.direction = {0, 1, 0}; // ceiling light
+    shadowRay.origin = ray.origin + ray.direction * prd.tHit;
+    shadowRay.direction = -lp.lightDir;
     RayPayload shadowPrd;
     shadowPrd.missed = true;
     shadowPrd.rgba = vec4f(0, 0, 0, 0);
     shadowPrd.dataValue = 0;
     shadowPrd.debug = dbg();
-    shadowPrd.t0 = 0.5f;
+    shadowPrd.t0 = 0.0f;
     shadowPrd.t1 = 1e20f;
     shadowPrd.tHit = 1e20f;
     owl::traceRay(/*accel to trace against*/ lp.volume.macrocellTLAS,
                   /*the ray to trace*/ shadowRay,
                   /*prd*/ shadowPrd);
-
+    if (shadowPrd.missed)
+    {
+      shadowPrd.rgba.w = 0.0f;
+    }
     vec3f shadow = vec3f((1.f - 0.2f) * (1.f - shadowPrd.rgba.w) + 0.2f);
     float light_intensity = 2.0f;
     albedo = albedo * shadow * light_intensity;
@@ -423,7 +426,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   vec4f color = vec4f(albedo, albedo_alpha); // prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
 
   // vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
-  color = over(color, vec4f(owl::getProgramData<MissProgData>().color1, 1.0f));
+  //color = over(color, vec4f(owl::getProgramData<MissProgData>().color1, 1.0f));
   const int fbOfs = pixelID.x + lp.fbSize.x * pixelID.y;
   // lp.fbPtr[fbOfs] = owl::make_rgba(color);
   vec4f oldColor = lp.accumBuffer[fbOfs];
@@ -435,7 +438,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   if (pixelID.x == lp.fbSize.x / 2 || pixelID.y == lp.fbSize.y / 2 ||
       pixelID.x == lp.fbSize.x / 2 + 1 || pixelID.y == lp.fbSize.y / 2 + 1 ||
       pixelID.x == lp.fbSize.x / 2 - 1 || pixelID.y == lp.fbSize.y / 2 - 1)
-    lp.fbPtr[fbOfs] = owl::make_rgba(color * 0.33f);
+    lp.fbPtr[fbOfs] = owl::make_rgba(1.f-color * 0.33f);
 #endif
 }
 
@@ -466,14 +469,14 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
   auto &lp = optixLaunchParams;
   vec3f origin = vec3f(optixGetWorldRayOrigin());
   vec3f direction = vec3f(optixGetWorldRayDirection());
-  prd.missed = false;
+  prd.missed = true;
+  prd.rgba = missColor();
 
   // auto sampler = Sampler(prd.debug);
   owl::Ray ray;
   ray.origin = origin;
   ray.direction = {1, 1, 1};
-  // RayPayload prd;
-  prd.dataValue = 0.f;
+  prd.dataValue = NAN;
 
   float majorantExtinction = transferFunction(self.bboxes[1].w).w;
   // normalize the majorant
@@ -484,7 +487,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
   if (majorantExtinction == 0.f)
     return;
 
-  float unit = lp.volume.dt;
+  float unit = max(lp.volume.dt, 0.0001f);
   float t = prd.t0;
   for (int i = 0; i < 100000; ++i)
   {
@@ -502,14 +505,14 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
     owl::Ray ray;
     ray.origin = x;
     ray.direction = {1, 1, 1};
-    prd.dataValue = 0.f;
+    prd.dataValue = NAN;
 
     owl::traceRay(lp.volume.elementTLAS, ray, prd,
                   OPTIX_RAY_FLAG_DISABLE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT);
 
     //------------------------------------
-    float4 xf = missColor();
-    if (prd.dataValue != 0.0f)
+    float4 xf ={0,0,0,0}; //missColor();
+    if (!isnan(prd.dataValue))
     {
       xf = transferFunction(prd.dataValue);
       prd.dataValue = prd.dataValue;
@@ -524,9 +527,13 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
     {
       prd.tHit = min(prd.tHit, t);
       prd.rgba = vec4f(vec3f(xf), 1.f);
+      prd.missed = false;
       break;
     }
   }
+  if (prd.debug)
+    printf("rgba: %f %f %f %f, tHit: %f dataValue: %f\n",
+           prd.rgba.x, prd.rgba.y, prd.rgba.z, prd.rgba.w, prd.tHit, prd.dataValue);
 }
 
 OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
@@ -866,14 +873,14 @@ OPTIX_BOUNDS_PROGRAM(HexahedraBounds)
   vec3f P5 = self.vertices[i5];
   vec3f P6 = self.vertices[i6];
   vec3f P7 = self.vertices[i7];
-  primBounds = primBounds.including(P0)
-                   .including(P1)
-                   .including(P2)
-                   .including(P3)
-                   .including(P4)
-                   .including(P5)
-                   .including(P6)
-                   .including(P7);
+  primBounds.extend(P0)
+            .extend(P1)
+            .extend(P2)
+            .extend(P3)
+            .extend(P4)
+            .extend(P5)
+            .extend(P6)
+            .extend(P7);
   //primBounds.extend(P7); // wtf??!
 }
 
@@ -1033,9 +1040,6 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
   {
     prd.t0 = max(prd.t0, tNear);
     prd.t1 = min(prd.t1, tFar);
-
-    if (prd.debug)
-      printf("Minmax: %f %f\n", prd.t0, prd.t1);
 
     // prd.rng.init(bbox.lower.w, bbox.upper.w);
     //  prd.rgba = make_float4(prd.rng(), prd.rng(), prd.rng(), 1.f);
@@ -1214,7 +1218,7 @@ OPTIX_INTERSECT_PROGRAM(HexahedraPointQuery)
 
   // printf("TetrahedraPointQuery: primID = %d\\n", primID);
 
-  unsigned int ID = (uint32_t(primID) /*+ self.offset*/) /* ELEMENTS_PER_BOX*/;
+  unsigned int ID = (uint32_t(primID)) /* ELEMENTS_PER_BOX*/;
 
   vec3f P = {origin.x, origin.y, origin.z};
 

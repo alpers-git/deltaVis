@@ -37,6 +37,7 @@ OWLVarDecl launchParamVars[] = {
     {"fbPtr", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, fbPtr)},
     {"fbSize", OWL_INT2, OWL_OFFSETOF(LaunchParams, fbSize)},
     {"shadows", OWL_BOOL, OWL_OFFSETOF(LaunchParams, shadows)},
+    {"lightDir", OWL_FLOAT3, OWL_OFFSETOF(LaunchParams, lightDir)},
     // accum buffer
     {"accumID", OWL_INT, OWL_OFFSETOF(LaunchParams, accumID)},
     {"accumBuffer", OWL_BUFPTR, OWL_OFFSETOF(LaunchParams, accumBuffer)},
@@ -492,6 +493,14 @@ namespace deltaVis
     //                        colorMap.size(),1,
     //                        colorMap.data());
     owlParamsSetRaw(lp, "transferFunction.xf", &colorMapTexture);
+    accumID = 0;
+    owlParamsSet1i(lp, "accumID", accumID);
+  }
+
+  void Renderer::SetLightDir(const vec3f &dir)
+  {
+    lightDir = dir;
+    owlParamsSet3f(lp, "lightDir", (const owl3f &)dir);
     accumID = 0;
   }
 

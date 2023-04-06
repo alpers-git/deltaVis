@@ -117,10 +117,16 @@ int main(int ac, char **av)
       ImGui::SameLine();
       if (ImGui::SliderFloat("##5", &opacity, 0.0f, 1.0f))
         renderer.SetOpacityScale(opacity);
-      if(ImGui::DragFloat("volume dt", &renderer.dt, 0.01f, 0.0f, 1.0f))
+      if(ImGui::DragFloat("volume dt", &renderer.dt, 0.0001f, 0.0001f, 2.0f))
+      {
         renderer.accumID = 0;
+        renderer.dt = max(renderer.dt, 0.0001f);
+      }
       if(ImGui::Checkbox("Shadows", &renderer.shadows))
           renderer.accumID = 0;
+      ImGui::SameLine();
+      if(ImGui::DragFloat3("Light direction", &renderer.lightDir[0], 0.01f, -1.0f, 1.0f))
+        renderer.SetLightDir(renderer.lightDir);
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "Avg. FPS: %.1f", 1.0f/renderer.avgFrameTime);
       tfn_widget.draw_ui();
     }
