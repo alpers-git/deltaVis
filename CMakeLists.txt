@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 86)
+  set(CMAKE_CUDA_ARCHITECTURES 75)
 endif()
 project(deltaVis LANGUAGES C CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
@@ -72,6 +72,7 @@ add_executable(deltaVisViewer
     EntryPoint.cpp
     Renderer.h
     Renderer.cpp
+    Renderer.cu
     GLFWHandler.h
     GLFWHandler.cpp
     Camera.h

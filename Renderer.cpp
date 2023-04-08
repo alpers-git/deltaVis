@@ -163,8 +163,8 @@ namespace deltaVis
     owlGeomTypeSetBoundsProg(macrocellType, module, "MacrocellBounds");
 
     owlGeomTypeSetClosestHit(triangleType, 0, module, "TriangleClosestHit");
-    owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"DeltaTracking");
-    //owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module, "AdaptiveDeltaTracking");
+    //owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module,"DeltaTracking");
+    owlGeomTypeSetClosestHit(macrocellType, /*ray type */ 0, module, "AdaptiveDeltaTracking");
 
     owlBuildPrograms(context);
     // owlBuildPipeline(context);
@@ -213,12 +213,13 @@ namespace deltaVis
                                      umeshPtr->perVertex->values.data(), umeshPtr->vertices.size());
     for (int i = 0; i < numMacrocells; i++)
       std::cout << grid[i].lower << " " << grid[i].upper << std::endl;
-    OWLBuffer gridBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
+    gridBuffer = owlDeviceBufferCreate(context, OWL_FLOAT4, numMacrocells * 2, nullptr);
     owlBufferUpload(gridBuffer, grid);
+    majorantBuffer = owlDeviceBufferCreate(context, OWL_FLOAT, numMacrocells, nullptr);
     OWLGeom userGeom = owlGeomCreate(context, macrocellType);
     owlGeomSetPrimCount(userGeom, numMacrocells);
     // owlGeomSet1i(userGeom, "offset", 0);
-    // owlGeomSetBuffer(userGeom, "maxima", nullptr);
+    owlGeomSetBuffer(userGeom, "maxima", majorantBuffer);
     owlGeomSetBuffer(userGeom, "bboxes", gridBuffer);
 
     auto macrocellBLAS = owlUserGeomGroupCreate(context, 1, &userGeom, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
@@ -347,7 +348,6 @@ namespace deltaVis
     auto center = umeshPtr->getBounds().center();
     vec3f eye = vec3f(center.x, center.y, center.z + 2.5f * (umeshPtr->getBounds().upper.z - umeshPtr->getBounds().lower.z));
     camera.setOrientation(eye, vec3f(center.x, center.y, center.z), vec3f(0, 1, 0), 45.0f);
-    camera.motionSpeed = 10.f;
 
     // set up camera controller
     controller = new CameraManipulator(&camera);
@@ -365,6 +365,107 @@ namespace deltaVis
     printf("volDomain: %f %f\n", volDomain.lower, volDomain.upper);
     owlParamsSet2f(lp, "transferFunction.volumeDomain", owl2f{volDomain.lower, volDomain.upper});
 
+    double avgBbox = 0.0f;
+    double counter = 0;
+    for(auto tet : umeshPtr->tets)
+    {
+      box3f bbox;
+      bbox.extend({umeshPtr->vertices[tet[0]].x,
+        umeshPtr->vertices[tet[0]].y,
+        umeshPtr->vertices[tet[0]].z});
+      bbox.extend({umeshPtr->vertices[tet[1]].x,
+        umeshPtr->vertices[tet[1]].y,
+        umeshPtr->vertices[tet[1]].z});
+      bbox.extend({umeshPtr->vertices[tet[2]].x,
+        umeshPtr->vertices[tet[2]].y,
+        umeshPtr->vertices[tet[2]].z});
+      bbox.extend({umeshPtr->vertices[tet[3]].x,
+        umeshPtr->vertices[tet[3]].y,
+        umeshPtr->vertices[tet[3]].z});
+      avgBbox += owl::common::length(bbox.span());
+      counter+=1.f;
+    }
+    for(auto pyr : umeshPtr->pyrs)
+    {
+      box3f bbox;
+      bbox.extend({umeshPtr->vertices[pyr[0]].x,
+        umeshPtr->vertices[pyr[0]].y,
+        umeshPtr->vertices[pyr[0]].z});
+      bbox.extend({umeshPtr->vertices[pyr[1]].x,
+        umeshPtr->vertices[pyr[1]].y,
+        umeshPtr->vertices[pyr[1]].z});
+      bbox.extend({umeshPtr->vertices[pyr[2]].x,
+        umeshPtr->vertices[pyr[2]].y,
+        umeshPtr->vertices[pyr[2]].z});
+      bbox.extend({umeshPtr->vertices[pyr[3]].x,
+        umeshPtr->vertices[pyr[3]].y,
+        umeshPtr->vertices[pyr[3]].z});
+      bbox.extend({umeshPtr->vertices[pyr[4]].x,
+        umeshPtr->vertices[pyr[4]].y,
+        umeshPtr->vertices[pyr[4]].z});
+      avgBbox += owl::common::length(bbox.span());
+      counter+=1.f;
+    }
+    for(auto wed : umeshPtr->wedges)
+    {
+      box3f bbox;
+      bbox.extend({umeshPtr->vertices[wed[0]].x,
+        umeshPtr->vertices[wed[0]].y,
+        umeshPtr->vertices[wed[0]].z});
+      bbox.extend({umeshPtr->vertices[wed[1]].x,
+        umeshPtr->vertices[wed[1]].y,
+        umeshPtr->vertices[wed[1]].z});
+      bbox.extend({umeshPtr->vertices[wed[2]].x,
+        umeshPtr->vertices[wed[2]].y,
+        umeshPtr->vertices[wed[2]].z});
+      bbox.extend({umeshPtr->vertices[wed[3]].x,
+        umeshPtr->vertices[wed[3]].y,
+        umeshPtr->vertices[wed[3]].z});
+      bbox.extend({umeshPtr->vertices[wed[4]].x,
+        umeshPtr->vertices[wed[4]].y,
+        umeshPtr->vertices[wed[4]].z});
+      bbox.extend({umeshPtr->vertices[wed[5]].x,
+        umeshPtr->vertices[wed[5]].y,
+        umeshPtr->vertices[wed[5]].z});
+      avgBbox += owl::common::length(bbox.span());
+      counter+=1.f;
+    }
+    for(auto hex : umeshPtr->hexes)
+    {
+      box3f bbox;
+      bbox.extend({umeshPtr->vertices[hex[0]].x,
+        umeshPtr->vertices[hex[0]].y,
+        umeshPtr->vertices[hex[0]].z});
+      bbox.extend({umeshPtr->vertices[hex[1]].x,
+        umeshPtr->vertices[hex[1]].y,
+        umeshPtr->vertices[hex[1]].z});
+      bbox.extend({umeshPtr->vertices[hex[2]].x,
+        umeshPtr->vertices[hex[2]].y,
+        umeshPtr->vertices[hex[2]].z});
+      bbox.extend({umeshPtr->vertices[hex[3]].x,
+        umeshPtr->vertices[hex[3]].y,
+        umeshPtr->vertices[hex[3]].z});
+      bbox.extend({umeshPtr->vertices[hex[4]].x,
+        umeshPtr->vertices[hex[4]].y,
+        umeshPtr->vertices[hex[4]].z});
+      bbox.extend({umeshPtr->vertices[hex[5]].x,
+        umeshPtr->vertices[hex[5]].y,
+        umeshPtr->vertices[hex[5]].z});
+      bbox.extend({umeshPtr->vertices[hex[6]].x,
+        umeshPtr->vertices[hex[6]].y,
+        umeshPtr->vertices[hex[6]].z});
+      bbox.extend({umeshPtr->vertices[hex[7]].x,
+        umeshPtr->vertices[hex[7]].y,
+        umeshPtr->vertices[hex[7]].z});
+      avgBbox += owl::common::length(bbox.span());
+      counter+=1.f;
+    }
+
+    avgBbox /= counter;
+    dt = avgBbox;
+
+    printf("avg bbox size: %f\n", avgBbox);
+    
     // ##################################################################
     // build *SBT* required to trace the groups
     // ##################################################################
@@ -428,6 +529,7 @@ namespace deltaVis
   {
     owlParamsSet1f(lp, "transferFunction.opacityScale", scale);
     accumID = 0;
+    RecalculateDensityRanges();
   }
 
   void Renderer::SetColorMap(const std::vector<vec4f> &newCM)
@@ -495,6 +597,7 @@ namespace deltaVis
     owlParamsSetRaw(lp, "transferFunction.xf", &colorMapTexture);
     accumID = 0;
     owlParamsSet1i(lp, "accumID", accumID);
+    RecalculateDensityRanges();
   }
 
   void Renderer::SetLightDir(const vec3f &dir)
@@ -525,6 +628,7 @@ namespace deltaVis
     const vec3f lower_left_corner = origin - half_width * focusDist * u - half_height * focusDist * v - focusDist * w;
     const vec3f horizontal = 2.0f * half_width * focusDist * u;
     const vec3f vertical = 2.0f * half_height * focusDist * v;
+    camera.motionSpeed = umesh::length(umeshPtr->getBounds().size()) / 50.f;
 
     accumID = 0;
 

@@ -31,6 +31,7 @@ public:
     void SetOpacityScale(float scale);
     void SetColorMap(const std::vector<owl::vec4f> &newXF);
     void SetLightDir(const owl::vec3f &newDir);
+    void RecalculateDensityRanges();
 
     void Shutdown();
 
@@ -80,13 +81,15 @@ public:
     OWLBuffer  wedgesData;
     OWLBuffer  verticesData;
     OWLBuffer  scalarData;
+    OWLBuffer gridBuffer;
+    OWLBuffer majorantBuffer;
 
     OWLBuffer vertexBuffer;
     OWLBuffer indexBuffer;
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {1,1,1};
+    vec3i macrocellDims = {10,10,10};
 
 
     OWLBuffer colorMapBuffer { 0 };

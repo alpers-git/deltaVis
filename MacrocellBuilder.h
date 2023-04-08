@@ -1,23 +1,23 @@
 #ifndef MACROCELL_BUILDER_HXX
 #define MACROCELL_BUILDER_HXX
 
-#include "owl/common.h"
 #include "umesh/io/UMesh.h"
+#include "owl/common.h"
 // Note, the above dependency can be found here: https://github.com/owl-project/owl
 
 namespace deltaVis
 {
     using namespace owl;
 
-#ifdef __CUDACC__
-#ifndef CUDA_DECORATOR
-#define CUDA_DECORATOR __both__
-#endif
-#else
-#ifndef CUDA_DECORATOR
-#define CUDA_DECORATOR
-#endif
-#endif
+    #ifdef __CUDACC__
+    #ifndef CUDA_DECORATOR
+    #define CUDA_DECORATOR __both__
+    #endif
+    #else
+    #ifndef CUDA_DECORATOR
+    #define CUDA_DECORATOR
+    #endif
+    #endif
 
     inline CUDA_DECORATOR box4f *BuildMacrocellGrid(vec3i dims,
                                                     umesh::vec3f *vertices,
@@ -58,15 +58,17 @@ namespace deltaVis
                         if (tempBox.contains(vec3f(vertices[v].x, vertices[v].y, vertices[v].z)))
                         {
                             // extend the cell bounds to include the current vertex
-                            cellBounds.extend(vec4f(vertices[v].x, vertices[v].y, vertices[v].z, scalars[v]));
+                            cellBounds.extend(vec4f(vertices[v].x, vertices[v].y, vertices[v].z,
+                                    scalars[v])
+                                );
                         }
                     }
                     // insert the cell bounds into the grid
                     grid[i + j * dims.x + k * dims.x * dims.y] = cellBounds;
                 }
-            }  
+            }
         }
-        
+
         return grid;
     }
 }

@@ -11,7 +11,7 @@ namespace deltaVis
 {
 const float kbd_rotate_degrees = 100.f;
 const float degrees_per_drag_fraction = 250;
-const float pixels_per_move = 100.f;
+const float pixels_per_move = 90.f;
 
 CameraManipulator::CameraManipulator(Camera *camera)
 {

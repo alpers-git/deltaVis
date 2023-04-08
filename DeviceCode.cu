@@ -286,7 +286,7 @@ inline __device__ float3 operator-(const float3 &a)
 }
 //-------------------------------------------------------------
 
-inline __device__
+inline __both__
     float4
     transferFunction(float f)
 {
@@ -416,7 +416,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
       shadowPrd.rgba.w = 0.0f;
     }
     vec3f shadow = vec3f((1.f - 0.2f) * (1.f - shadowPrd.rgba.w) + 0.2f);
-    float light_intensity = 2.0f;
+    float light_intensity = 1.0f;
     albedo = albedo * shadow * light_intensity;
   }
 
@@ -426,7 +426,7 @@ OPTIX_RAYGEN_PROGRAM(simpleRayGen)
   vec4f color = vec4f(albedo, albedo_alpha); // prd.missed ? prd.rgba : vec4f(tfColor.x, tfColor.y, tfColor.z, tfColor.w);
 
   // vec3f color = vec3f(prd.rgba.x, prd.rgba.y, prd.rgba.z);
-  //color = over(color, vec4f(owl::getProgramData<MissProgData>().color1, 1.0f));
+  color = over(color, vec4f(owl::getProgramData<MissProgData>().color1, 1.0f));
   const int fbOfs = pixelID.x + lp.fbSize.x * pixelID.y;
   // lp.fbPtr[fbOfs] = owl::make_rgba(color);
   vec4f oldColor = lp.accumBuffer[fbOfs];
@@ -478,7 +478,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(DeltaTracking)
   ray.direction = {1, 1, 1};
   prd.dataValue = NAN;
 
-  float majorantExtinction = transferFunction(self.bboxes[1].w).w;
+  float majorantExtinction = self.maxima[0];//transferFunction(self.bboxes[1].w).w;
   // normalize the majorant
   // majorantExtinction = (majorantExtinction - lp.transferFunction.volumeDomain.x) /
   //                      (lp.transferFunction.volumeDomain.y - lp.transferFunction.volumeDomain.x);
@@ -542,7 +542,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
   const MacrocellData &self = owl::getProgramData<MacrocellData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
   auto &lp = optixLaunchParams;
-  int numAdaptiveRays = 32; // lp.volume.numAdaptiveSamplingRays;
+  int numAdaptiveRays = 2; // lp.volume.numAdaptiveSamplingRays;
   //printf("called adaptive delta tracking\n");
   for (int asi = 0; asi < numAdaptiveRays; ++asi)
   {
@@ -590,7 +590,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
 
       // Sample free-flight distance
       float t = t0;
-      float unit = 0.1f;
+      float unit = lp.volume.dt;
       while (true)
       {
         t = t - (log(1.0f - prd.rng()) / majorantExtinction) * unit;
@@ -897,7 +897,7 @@ OPTIX_INTERSECT_PROGRAM(MacrocellIntersection)
   float3 origin = optixGetObjectRayOrigin();
 
   // Get bbox max
-  float maxima = transferFunction(self.bboxes[primID*2 + 1].w).w;
+  float maxima = self.maxima[primID];//transferFunction(self.bboxes[primID*2 + 1].w).w;
 
   /* Skip "splatting" empty bounds */
   if (maxima <= 0.f)
@@ -972,9 +972,9 @@ OPTIX_INTERSECT_PROGRAM(VolumeIntersection)
     return;
 
   box4f bbox;
-  // bbox.lower = make_vec4f(lp.volume.globalBoundsLo);
-  // bbox.upper = make_vec4f(lp.volume.globalBoundsHi);
-  bbox.extend(self.bboxes[2 * primID]).extend(self.bboxes[2 * primID + 1]);
+  bbox.lower = make_vec4f(lp.volume.globalBoundsLo);
+  bbox.upper = make_vec4f(lp.volume.globalBoundsHi);
+  //bbox.extend(self.bboxes[2 * primID]).extend(self.bboxes[2 * primID + 1]);
   float3 lb = make_float3(bbox.lower.x, bbox.lower.y, bbox.lower.z);
   float3 rt = make_float3(bbox.upper.x, bbox.upper.y, bbox.upper.z);
   float3 origin = optixGetObjectRayOrigin();

@@ -50,13 +50,43 @@ int main(int ac, char **av)
   std::cout << "found " << umeshHdlPtr->hexes.size() << " hexahedra" << std::endl;
   std::cout << "found " << umeshHdlPtr->vertices.size() << " vertices" << std::endl;
 
-  // create a window and a GL context
-  auto glfw = GLFWHandler::getInstance();
-  glfw->initWindow(1000, 1000, "DeltaVisViewer");
-
   // create a context on the first device:
   Renderer renderer(umeshHdlPtr);
   renderer.Init();
+
+  if (ac > 2)
+  {
+    // parse the argument that is the camera comfigurations -position, lookat, up, fovy, focalDist
+
+    // find the argument after 1 that starts with -cam
+    int camArg = 2;
+    while (camArg < ac)
+    {
+      if (av[camArg][0] == '-' && av[camArg][1] == 'c' && av[camArg][2] == 'a' && av[camArg][3] == 'm')
+      {
+        break;
+      }
+      camArg++;
+    }
+    if (camArg < ac)
+    {
+      // parse the camera arguments
+      vec3f lookFrom, lookAt, lookUp;
+      float cosFovy;
+      if (camArg + 4 < ac)
+      {
+        lookFrom = vec3f(atof(av[camArg + 1]), atof(av[camArg + 2]), atof(av[camArg + 3]));
+        lookAt = vec3f(atof(av[camArg + 4]), atof(av[camArg + 5]), atof(av[camArg + 6]));
+        lookUp = vec3f(atof(av[camArg + 7]), atof(av[camArg + 8]), atof(av[camArg + 9]));
+        cosFovy = atof(av[camArg + 10]);
+      }
+      renderer.camera.setOrientation(lookFrom, lookAt, lookUp, toDegrees(cosFovy));
+    }
+  }
+
+  // create a window and a GL context
+  auto glfw = GLFWHandler::getInstance();
+  glfw->initWindow(1000, 1000, "DeltaVisViewer");
 
   renderer.Resize(vec2i(1000, 1000));
   int x, y;
@@ -102,6 +132,15 @@ int main(int ac, char **av)
     if (glfw->key.isPressed(GLFW_KEY_1) && glfw->key.isDown(GLFW_KEY_RIGHT_SHIFT)) //!
       stbi_write_png(std::string("frame.png").c_str(), renderer.fbSize.x, renderer.fbSize.y, 4,
                      fb, renderer.fbSize.x * sizeof(uint32_t));
+    // Printing camera parameters as a callable arguments
+    if (glfw->key.isPressed(GLFW_KEY_C))
+      printf(" -cam %f %f %f %f %f %f %f %f %f %f\n",
+             renderer.camera.position.x, renderer.camera.position.y,
+             renderer.camera.position.z, renderer.camera.getAt().x,
+             renderer.camera.getAt().y, renderer.camera.getAt().z,
+             renderer.camera.getUp().x, renderer.camera.getUp().y,
+             renderer.camera.getUp().z, renderer.camera.getCosFovy());
+
     fCount++;
 
     //----------------ImGui----------------
@@ -117,17 +156,17 @@ int main(int ac, char **av)
       ImGui::SameLine();
       if (ImGui::SliderFloat("##5", &opacity, 0.0f, 1.0f))
         renderer.SetOpacityScale(opacity);
-      if(ImGui::DragFloat("volume dt", &renderer.dt, 0.0001f, 0.0001f, 2.0f))
+      if (ImGui::DragFloat("volume dt", &renderer.dt, 0.0001f, 0.0001f, 2.0f))
       {
         renderer.accumID = 0;
         renderer.dt = max(renderer.dt, 0.0001f);
       }
-      if(ImGui::Checkbox("Shadows", &renderer.shadows))
-          renderer.accumID = 0;
+      if (ImGui::Checkbox("Shadows", &renderer.shadows))
+        renderer.accumID = 0;
       ImGui::SameLine();
-      if(ImGui::DragFloat3("Light direction", &renderer.lightDir[0], 0.01f, -1.0f, 1.0f))
+      if (ImGui::DragFloat3("Light direction", &renderer.lightDir[0], 0.01f, -1.0f, 1.0f))
         renderer.SetLightDir(renderer.lightDir);
-      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Avg. FPS: %.1f", 1.0f/renderer.avgFrameTime);
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Avg. FPS: %.1f", 1.0f / renderer.avgFrameTime);
       tfn_widget.draw_ui();
     }
     ImGui::End();
@@ -150,7 +189,7 @@ int main(int ac, char **av)
       for (int i = 0; i < cm.size(); i += 4)
       {
         colorMapVec.push_back(owl::vec4f(cm[i],
-                                        cm[i + 1], cm[i + 2], cm[i + 3]));
+                                         cm[i + 1], cm[i + 2], cm[i + 3]));
       }
       renderer.SetColorMap(colorMapVec);
     }
