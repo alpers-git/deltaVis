@@ -475,7 +475,7 @@ namespace deltaVis
     delete[] grid;
   }
 
-  void Renderer::Render()
+  void Renderer::Render(bool headless)
   {
     owlBuildSBT(context);
     // get time start
@@ -485,7 +485,7 @@ namespace deltaVis
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     lastFrameTime = elapsed.count();
-    avgFrameTime = 0.95 * avgFrameTime + 0.05 * elapsed.count();
+    avgFrameTime = 0.75 * avgFrameTime + 0.25 * elapsed.count();
 
     accumID++;
     frameID++;
@@ -493,9 +493,12 @@ namespace deltaVis
     owlParamsSet1i(lp, "frameID", frameID);
     // for host pinned mem it doesn't matter which device we query...
     // const uint32_t *fb = (const uint32_t*)owlBufferGetPointer(frameBuffer,0);
+    if(headless)
+      printf("frame %i, time %f, avg time %f, fps %f \n", frameID, lastFrameTime,
+             avgFrameTime, 1.f / avgFrameTime);
   }
 
-  void Renderer::Update()
+  void Renderer::Update(bool headless)
   {
     if (controller->ProcessEvents())
       OnCameraChange();
@@ -503,7 +506,7 @@ namespace deltaVis
     owlParamsSet1b(lp, "shadows", shadows);
 
     auto glfw = GLFWHandler::getInstance();
-    if (glfw->getWindowSize() != fbSize)
+    if (!headless && glfw->getWindowSize() != fbSize)
       Resize(glfw->getWindowSize());
   }
 

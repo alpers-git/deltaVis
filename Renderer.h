@@ -25,8 +25,8 @@ public:
     ~Renderer();
 
     void Init();
-    void Render();
-    void Update();
+    void Render(bool headless = false);
+    void Update(bool headless = false);
     void Resize(const vec2i newSize);
     void SetOpacityScale(float scale);
     void SetColorMap(const std::vector<owl::vec4f> &newXF);
@@ -89,7 +89,7 @@ public:
     OWLBuffer frameBuffer;
 
     vec2i fbSize = vec2i(800,600);
-    vec3i macrocellDims = {10,10,10};
+    vec3i macrocellDims = {4,4,4};
 
 
     OWLBuffer colorMapBuffer { 0 };

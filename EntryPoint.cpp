@@ -24,6 +24,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define HEADLESS 0
+
 using namespace deltaVis;
 
 int main(int ac, char **av)
@@ -32,6 +34,7 @@ int main(int ac, char **av)
   stbi_flip_vertically_on_write(true);
 
   // read the input file from cmd line
+  std::vector<owl::vec4f> colorMapVec;
   if (ac < 2)
   {
     std::cout << "Usage: DeltaVisViewer <input file>" << std::endl;
@@ -82,16 +85,74 @@ int main(int ac, char **av)
       }
       renderer.camera.setOrientation(lookFrom, lookAt, lookUp, toDegrees(cosFovy));
     }
+
+    // find the argument after 1 that starts with -tf
+    int tfArg = 2;
+    while (tfArg < ac)
+    {
+      if (av[tfArg][0] == '-' && av[tfArg][1] == 't' && av[tfArg][2] == 'f')
+      {
+        break;
+      }
+      tfArg++;
+    }
+    if (tfArg < ac)
+    {
+      // get the path to the transfer function and parse the text file
+      std::string tfPath = av[tfArg + 1];
+      FILE *fp = fopen(tfPath.c_str(), "r");
+      if (fp == NULL)
+      {
+        std::cout << "could not tf file " << tfPath << std::endl;
+        return 0;
+      }
+      char line[1024];
+      //first lien is opacity scale
+      fgets(line, 1024, fp);
+      float opacityScale = atof(line);
+      renderer.SetOpacityScale(opacityScale);
+      //parse the file till the end push vec4f into the colorMapVec
+      while (fgets(line, 1024, fp) != NULL)
+      {
+        float r, g, b, a;
+        sscanf(line, "%f %f %f %f", &r, &g, &b, &a);
+        colorMapVec.push_back(vec4f(r, g, b, a));
+      }
+      renderer.SetColorMap(colorMapVec);
+    }
+    // find the argument that is -shadow
+    int shadowArg = 2;
+    while (shadowArg < ac)
+    {
+      if (av[shadowArg][0] == '-' && av[shadowArg][1] == 's' &&
+       av[shadowArg][2] == 'h' && av[shadowArg][3] == 'a' &&
+        av[shadowArg][4] == 'd' && av[shadowArg][5] == 'o' &&
+         av[shadowArg][6] == 'w')
+      {
+        renderer.shadows = true;
+        break;
+      }
+      shadowArg++;
+    }
+    //get three float values set to light direction
+    if (shadowArg < ac)
+    {
+      renderer.SetLightDir(vec3f(atof(av[shadowArg + 1]),
+       atof(av[shadowArg + 2]), atof(av[shadowArg + 3])));
+    }
   }
 
-  // create a window and a GL context
+// create a window and a GL context
+#if HEADLESS
   auto glfw = GLFWHandler::getInstance();
   glfw->initWindow(1000, 1000, "DeltaVisViewer");
+#endif
 
   renderer.Resize(vec2i(1000, 1000));
   int x, y;
   x = y = 1000;
 
+#if HEADLESS
   //----------Create ImGui Context----------------
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
@@ -109,24 +170,41 @@ int main(int ac, char **av)
   }
   // create a transfer function editor
   tfnw::TransferFunctionWidget tfn_widget;
+#else
+  ImGui::CreateContext();
+  tfnw::TransferFunctionWidget tfn_widget;
+  auto cm = tfn_widget.get_colormapf();
+  if(colorMapVec.size() == 0)
+  {
+    printf("using default colormap\n");
+    for (int i = 0; i < cm.size(); i += 4)
+    {
+      colorMapVec.push_back(owl::vec4f(cm[i],
+                                      cm[i + 1], cm[i + 2], cm[i + 3]));
+    }
+  }
+  renderer.SetColorMap(colorMapVec);
+#endif
 
   // ##################################################################
   // now that everything is ready: launch it ....
   // ##################################################################
-  int fCount = 0;
+  int fCount = 50;
+  float avgFrameTime = 0.f;
+#if HEADLESS
   while (!glfw->windowShouldClose())
+#else
+  while (fCount > 0)
+#endif
   {
     //----------------Renderer and Windowing----------------
     // render the frame
-    renderer.Render();
+    renderer.Render(HEADLESS == 0);
     const uint32_t *fb = (const uint32_t *)owlBufferGetPointer(renderer.frameBuffer, 0);
-
+#if HEADLESS
     // draw the frame to the window
     glfw->draw((void *)fb);
     assert(fb);
-
-    // if(glfw->key.isPressed(GLFW_KEY_ESCAPE))
-    //   glfw->setWindowShouldClose(true);
 
     // Taking a snapshot of the current frame
     if (glfw->key.isPressed(GLFW_KEY_1) && glfw->key.isDown(GLFW_KEY_RIGHT_SHIFT)) //!
@@ -140,8 +218,27 @@ int main(int ac, char **av)
              renderer.camera.getAt().y, renderer.camera.getAt().z,
              renderer.camera.getUp().x, renderer.camera.getUp().y,
              renderer.camera.getUp().z, renderer.camera.getCosFovy());
-
-    fCount++;
+    //writing transferfunction vector as a png
+    if(glfw->key.isPressed(GLFW_KEY_T))
+    {
+      auto cm = tfn_widget.get_colormapf();
+      std::vector<owl::vec4f> colorMapVec;
+      for (int i = 0; i < cm.size(); i += 4)
+      {
+        colorMapVec.push_back(owl::vec4f(cm[i],
+                                         cm[i + 1], cm[i + 2], cm[i + 3]));
+      }
+      //create file and write to it
+      FILE *fp = fopen("transferfunction.tf", "w");
+      fprintf(fp, "%f\n", renderer.opacityScale);
+      for(int i = 0; i < colorMapVec.size(); i++)
+      {
+        fprintf(fp, "%f %f %f %f\n", colorMapVec[i].x, colorMapVec[i].y, colorMapVec[i].z, colorMapVec[i].w);
+      }
+      //write opacity scale
+      fclose(fp);
+      printf("Transferfunction written to transferfunction.tf\n");
+    }
 
     //----------------ImGui----------------
     // request new frame
@@ -196,10 +293,22 @@ int main(int ac, char **av)
 
     glfw->swapBuffers();
     glfw->pollEvents();
-    renderer.Update();
+#else
+    fCount--;
+    avgFrameTime += renderer.lastFrameTime;
+    if (fCount == 0 || fCount == 45)
+      stbi_write_png(std::string("frame_" + std::to_string(fCount) + ".png").c_str(), renderer.fbSize.x, renderer.fbSize.y, 4,
+                     fb, renderer.fbSize.x * sizeof(uint32_t));
+#endif
+    renderer.Update(HEADLESS == 0);
   }
+  printf("==Overall average frame time: %fs OR %fFPS ==\n\tgrid:%d %d %d\n\tdt:%f\n",
+   avgFrameTime / 50.0f, 1.0f / (avgFrameTime / 50.0f), renderer.macrocellDims.x,
+    renderer.macrocellDims.y, renderer.macrocellDims.z, renderer.dt);
   renderer.Shutdown();
+#if HEADLESS
   glfw->destroyWindow();
+#endif
 
   return 0;
 }
