@@ -145,12 +145,12 @@ int main(int ac, char **av)
 // create a window and a GL context
 #if HEADLESS
   auto glfw = GLFWHandler::getInstance();
-  glfw->initWindow(1000, 1000, "DeltaVisViewer");
+  glfw->initWindow(1024, 1024, "DeltaVisViewer");
 #endif
 
-  renderer.Resize(vec2i(1000, 1000));
+  renderer.Resize(vec2i(1024, 1024));
   int x, y;
-  x = y = 1000;
+  x = y = 1024;
 
 #if HEADLESS
   //----------Create ImGui Context----------------
@@ -189,7 +189,7 @@ int main(int ac, char **av)
   // ##################################################################
   // now that everything is ready: launch it ....
   // ##################################################################
-  int fCount = 50;
+  int fCount = 105;
   float avgFrameTime = 0.f;
 #if HEADLESS
   while (!glfw->windowShouldClose())
@@ -295,10 +295,23 @@ int main(int ac, char **av)
     glfw->pollEvents();
 #else
     fCount--;
-    avgFrameTime += renderer.lastFrameTime;
-    if (fCount == 0 || fCount == 45)
-      stbi_write_png(std::string("frame_" + std::to_string(fCount) + ".png").c_str(), renderer.fbSize.x, renderer.fbSize.y, 4,
+    if (fCount < 100) {
+      avgFrameTime += renderer.lastFrameTime;
+    }
+    if (fCount == 0 || fCount == 100)
+    {
+      std::string filename = "./images/";
+      filename += inputFileName.substr(inputFileName.find_last_of("/") + 1);
+      filename = filename.substr(0, filename.find_last_of("."));
+      filename += "_" + std::to_string(renderer.macrocellDims.x) + "x" +
+                  std::to_string(renderer.macrocellDims.y) + "x" +
+                  std::to_string(renderer.macrocellDims.z);
+      filename += renderer.shadows ? "_shadows" :"_noshadows";
+      filename += "_frame_" + std::to_string(100 - fCount);
+      filename += ".png";
+      stbi_write_png(filename.c_str(), renderer.fbSize.x, renderer.fbSize.y, 4,
                      fb, renderer.fbSize.x * sizeof(uint32_t));
+    }
 #endif
     renderer.Update(HEADLESS == 0);
   }
