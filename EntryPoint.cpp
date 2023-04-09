@@ -140,6 +140,21 @@ int main(int ac, char **av)
       renderer.SetLightDir(vec3f(atof(av[shadowArg + 1]),
        atof(av[shadowArg + 2]), atof(av[shadowArg + 3])));
     }
+    // find the argument that is -numRays
+    int numRaysArg = 2;
+    while (numRaysArg < ac)
+    {
+      if (av[numRaysArg][0] == '-' && av[numRaysArg][1] == 'n' &&
+       av[numRaysArg][2] == 'u' && av[numRaysArg][3] == 'm' &&
+        av[numRaysArg][4] == 'R' && av[numRaysArg][5] == 'a' &&
+         av[numRaysArg][6] == 'y' && av[numRaysArg][7] == 's')
+      {
+        renderer.SetNumAdaptiveSamplingRays(atoi(av[numRaysArg + 1]));
+        printf("numRays %d\n", renderer.numAdaptiveSamplingRays);
+        break;
+      }
+      numRaysArg++;
+    }
   }
 
 // create a window and a GL context
@@ -253,7 +268,7 @@ int main(int ac, char **av)
       ImGui::SameLine();
       if (ImGui::SliderFloat("##5", &opacity, 0.0f, 1.0f))
         renderer.SetOpacityScale(opacity);
-      if (ImGui::DragFloat("volume dt", &renderer.dt, 0.0001f, 0.0001f, 2.0f))
+      if (ImGui::DragFloat("volume dt", &renderer.dt, 0.0001f, 0.0001f))
       {
         renderer.accumID = 0;
         renderer.dt = max(renderer.dt, 0.0001f);
@@ -306,6 +321,7 @@ int main(int ac, char **av)
       filename += "_" + std::to_string(renderer.macrocellDims.x) + "x" +
                   std::to_string(renderer.macrocellDims.y) + "x" +
                   std::to_string(renderer.macrocellDims.z);
+      filename += "_numRays_" + std::to_string(renderer.numAdaptiveSamplingRays);
       filename += renderer.shadows ? "_shadows" :"_noshadows";
       filename += "_frame_" + std::to_string(100 - fCount);
       filename += ".png";
@@ -316,7 +332,7 @@ int main(int ac, char **av)
     renderer.Update(HEADLESS == 0);
   }
   printf("==Overall average frame time: %fs OR %fFPS ==\n\tgrid:%d %d %d\n\tdt:%f\n",
-   avgFrameTime / 50.0f, 1.0f / (avgFrameTime / 50.0f), renderer.macrocellDims.x,
+   avgFrameTime / 100.0f, 1.0f / (avgFrameTime / 100.0f), renderer.macrocellDims.x,
     renderer.macrocellDims.y, renderer.macrocellDims.z, renderer.dt);
   renderer.Shutdown();
 #if HEADLESS

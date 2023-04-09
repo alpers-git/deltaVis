@@ -542,7 +542,7 @@ OPTIX_CLOSEST_HIT_PROGRAM(AdaptiveDeltaTracking)
   const MacrocellData &self = owl::getProgramData<MacrocellData>();
   RayPayload &prd = owl::getPRD<RayPayload>();
   auto &lp = optixLaunchParams;
-  int numAdaptiveRays = 2; // lp.volume.numAdaptiveSamplingRays;
+  int numAdaptiveRays = max(1, lp.volume.numAdaptiveSamplingRays);
   //printf("called adaptive delta tracking\n");
   for (int asi = 0; asi < numAdaptiveRays; ++asi)
   {
